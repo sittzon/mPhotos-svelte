@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using mPhotos.Helpers;
 
 namespace mPhotos.Controllers;
 
@@ -6,7 +7,7 @@ namespace mPhotos.Controllers;
 [Route("[controller]")]
 public class LibraryController : ControllerBase
 {
-    private static readonly string imgPath = @"/Users/magnusedetorn/Desktop/photosexport_20240921";
+    private static readonly string imgPath = @"/originals";
 
     private readonly ILogger<LibraryController> _logger;
 
@@ -16,13 +17,15 @@ public class LibraryController : ControllerBase
     }
 
     [HttpGet]
-    public LibraryMeta Get()
+    public async Task<LibraryMeta> Get()
     {
-        string[] fileNames = Directory.GetFiles(imgPath);
+        var originalPhotos = await FileHelper.GetFileInfosRecursively(imgPath);
+        originalPhotos = originalPhotos.Where(x => x.Extension.ToLower().Equals(".jpg") || x.Extension.ToLower().Equals(".jpeg"));
+
         return new LibraryMeta
         {
             LatestIndexTime = DateTime.Now,
-            TotalPhotosNo = fileNames.Count(),
+            TotalPhotosNo = originalPhotos.Count(),
             TotalSizeMb = 100
         };
     }

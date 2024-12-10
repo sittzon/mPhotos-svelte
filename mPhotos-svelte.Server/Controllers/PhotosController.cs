@@ -10,8 +10,8 @@ namespace mPhotos.Controllers;
 [Route("[controller]")]
 public class PhotosController : ControllerBase
 {
-    private static readonly string photosRoot = @"/Users/magnusedetorn/Desktop/photosexport_test_20240921";
-    private static readonly string thumbnailRoot = @"/Users/magnusedetorn/Desktop/mphotos-thumbs";
+    private static readonly string photosRoot = @"/originals";
+    private static readonly string thumbnailRoot = @"/thumbs";
     private static readonly string metaDataFilename = thumbnailRoot + "/metadata.json";
     private static readonly string errorLogFilename = thumbnailRoot + "/errors.log";
     private readonly IMemoryCache _memoryCache;
@@ -36,7 +36,7 @@ public class PhotosController : ControllerBase
         if (!_memoryCache.TryGetValue(_photosMetaCacheKey, out IEnumerable<PhotoMeta>? _)) {
             // Get all original photos info from disk
             // Only support jpg/jpeg for now
-            var originalPhotos = await GetFileInfosRecursively(photosRoot);
+            var originalPhotos = await FileHelper.GetFileInfosRecursively(photosRoot);
             originalPhotos = originalPhotos.Where(x => x.Extension.ToLower().Equals(".jpg") || x.Extension.ToLower().Equals(".jpeg"));
 
             // Read metadata file if exists
@@ -99,23 +99,6 @@ public class PhotosController : ControllerBase
             _memoryCache.Set(_photosMetaCacheKey, photoMetadata);
             System.IO.File.WriteAllText(metaDataFilename, JsonSerializer.Serialize(photoMetadata));
         }
-    }
-
-    private static async Task<IEnumerable<FileInfo>> GetFileInfosRecursively(string directory) {
-        var fileInfos = new List<FileInfo>();
-        // Exclude dotfiles
-        var files = new DirectoryInfo(directory)
-            .GetFiles()
-            .Where(x => !x.Name.FirstOrDefault().Equals('.'));
-        fileInfos.AddRange(files);
-
-        var dirs = Directory.GetDirectories(directory);
-        foreach (var dir in dirs) {
-            if (Directory.Exists(dir)){
-                fileInfos.AddRange(await GetFileInfosRecursively(dir));
-            }
-        }
-        return fileInfos;
     }
 
     private string? GuidToLocation(string guid) {

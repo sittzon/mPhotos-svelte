@@ -25,17 +25,27 @@
         const tempChunkSize = getCookie('chunkSize');
         chunkSize = tempChunkSize? +tempChunkSize : chunkSize;
 
-        // Fetch metadata
-        const api = new Api();
-        api.baseUrl = config.apiEndpoint;
-        const response = await api.photos.metadataList();
+        // Fetch metadata        
+        const dbMetadataList = "/api/metadatalist"
         
-        if (response.status == 200)
-        {
-            photosMeta = response.data;
+        const request = fetch(dbMetadataList, {
+            method: 'GET',
+            headers: {
+                'content-type': 'application/json'
+            }
+        });
+        await request
+        .then((response) => {
+            if (response.status == 200)
+            {
+                return response.json();
+            }
+        })
+        .then((data) => {
+            photosMeta = data;
             reChunk();
             currentDate = getDateFormattedShort(photosMeta[0]);
-        }
+        });
 
         // Add event listeners
         document.getElementById("photoModal")?.addEventListener("click", closeModal);
@@ -129,7 +139,7 @@
     const reChunk = (increaseChunkSize: boolean = false) => {
         // Increase chunk size and chunk
         if (increaseChunkSize) {
-            chunkSize = chunkSize==3? 5 : chunkSize==5? 7: chunkSize==7? 3 : 3;
+            chunkSize = chunkSize==3? 5 : chunkSize==5? 7: chunkSize==7? 9 : chunkSize==9? 12 : chunkSize==12? 3 : 3;
             setCookie('chunkSize', chunkSize.toString());
         }
         chunkedPhotos = chunkPhotos(photosMeta, chunkSize);
@@ -212,7 +222,7 @@
 </script>
 
 {#if !photoModalIsOpen}
-    <div style="position: fixed; z-index: 1; margin-left: 120px; margin-top: 10px">
+    <div class="text-rounded-corners" style="position: fixed; z-index: 1; margin-left: 120px; margin-top: 10px">
         <button id="chunkButton" on:click={() => reChunk(true)}>chunkSize {chunkSize}</button>
     </div>
     <div class="text-rounded-corners" style="position: fixed; z-index: 1; margin-left: 10px; margin-top: 10px; height: 25px">
@@ -228,15 +238,19 @@
 {/if}
 <div id="photoModal" style="display: none; justify-content: center; width: 100dvw; height: 100dvh; background-color: black; z-index: 100; align-items: center">
     {#if currentPhoto}
-        <button id="photoModalButtonPrev" style="position: fixed; left: 20px; opacity: 70%; height: 3rem; width: 4rem" on:click={prevPhoto}>prev</button>
-            <img id="photoModalImage"  
-                src="{config.apiEndpoint}/photos/{currentPhoto.guid}"
-                alt={currentPhoto.dateTaken}
-                style="max-height: 98dvh; max-width: 98vw; pointer-events: none; aspect-ratio: {currentAspectRatio}"
-                on:load={() => updateAspectRatio(currentPhoto)}
-            >
-        <button id="photoModalButtonNext" style="position: fixed; right: 20px; opacity: 70%; height: 3rem; width: 4rem" on:click={nextPhoto}>next</button>
-        <p class="text-rounded-corners" style="position: fixed; z-index: 102; margin-top: 98dvh; opacity: 80%">{getDateFormattedLong(currentPhoto)}</p>
+        <button id="photoModalButtonPrev" style="position: fixed; left: 20px; opacity: 70%; height: 3rem; width: 4rem; border-radius: 5px; z-index: 110;" on:click={prevPhoto}>
+            <img style="rotate: 180deg" src="/right-arrow.svg" width="16" alt=""/>
+        </button>
+        <img id="photoModalImage"  
+            src="api/photos/{currentPhoto.guid}"
+            alt={currentPhoto.dateTaken}
+            style="max-height: 98dvh; max-width: 98vw; pointer-events: none; aspect-ratio: {currentAspectRatio}"
+            on:load={() => updateAspectRatio(currentPhoto)}
+        />
+        <button id="photoModalButtonNext"  style="position: fixed; right: 20px; opacity: 70%; height: 3rem; width: 4rem; border-radius: 5px; z-index: 110;" on:click={nextPhoto}>
+            <img src="/right-arrow.svg" width="16" alt=""/>
+        </button>
+        <p class="text-rounded-corners" style="position: fixed; z-index: 110; margin-top: 98dvh; opacity: 80%">{getDateFormattedLong(currentPhoto)}</p>
      {/if}
 </div>
 <div style="width: 100vw; height: 100dvh; background-color: black">
@@ -249,7 +263,7 @@
     {scrollToIndex}
     scrollToAlignment="center"
     scrollToBehaviour="smooth"
-    overscanCount={chunkSize==3? 3 : chunkSize==5? 5 : 6 }
+    overscanCount={chunkSize==3? 4 : chunkSize==5? 6 : chunkSize==7? 7 : chunkSize==9? 8 :chunkSize==12? 12 : 12 }
     on:afterScroll={handleScroll}
     >
     <div slot="item" let:index let:style {style}>
@@ -260,7 +274,7 @@
                         <a on:click={() => openModal(currentPhotoMeta, index*chunkSize + itemIndex)} href='/'>
                             <img 
                             id={currentPhotoMeta.guid}
-                            src="{config.apiEndpoint}/photos/{currentPhotoMeta.guid}/thumb"
+                            src="api/photos/{currentPhotoMeta.guid}/thumb"
                             alt={currentPhotoMeta.dateTaken}
                             style="
                             width: 100%

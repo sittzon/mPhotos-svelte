@@ -1,0 +1,18 @@
+FROM node:23.3.0-bullseye AS clientbuild
+
+WORKDIR /app
+COPY /mPhotos-svelte.Client/package.json .
+COPY /mPhotos-svelte.Client/package-lock.json .
+RUN npm install
+
+COPY /mPhotos-svelte.Client/src/ ./src
+COPY /mPhotos-svelte.Client/static/ ./static
+COPY /mPhotos-svelte.Client/svelte.config.js .
+COPY /mPhotos-svelte.Client/tsconfig.json .
+COPY /mPhotos-svelte.Client/vite.config.ts .
+
+RUN npm run build
+
+EXPOSE 5174
+
+ENTRYPOINT ["npm", "run", "host"]

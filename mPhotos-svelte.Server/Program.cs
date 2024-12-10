@@ -18,11 +18,6 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy(WebsiteClientOrigin, policy =>
     {
-        var website = builder.Configuration["Endpoints:Website"];
-        if (website != null)
-        {
-            policy.WithOrigins(website).AllowAnyHeader().AllowAnyMethod();
-        }
         policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
     });
     options.AddPolicy("Access-Control-Allow-Origin", policy => {
