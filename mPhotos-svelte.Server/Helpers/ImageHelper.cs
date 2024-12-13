@@ -8,11 +8,11 @@ namespace mPhotos.Helpers
 {
     public class ImageHelper
     {
-        public static byte[] GenerateThumbnailBytes(Image image, int thumbnailWidth, int thumbnailHeight, string? filePath = null) {
+        public static byte[] GenerateThumbnailBytes(Image image, int thumbnailWidth, int thumbnailHeight, string? filePath = null, int quality = 50) {
             image.Mutate(x => x.Resize(thumbnailWidth, thumbnailHeight));
             var encoder = new WebpEncoder()
             {
-                Quality = 50,
+                Quality = quality,
                 Method = WebpEncodingMethod.Level3
             };
             
@@ -26,10 +26,10 @@ namespace mPhotos.Helpers
                 }
             }
         }
-        public static byte[] GenerateThumbnailBytes(byte[] imageData, int thumbnailWidth, int thumbnailHeight, string? filePath = null)
+        public static byte[] GenerateThumbnailBytes(byte[] imageData, int thumbnailWidth, int thumbnailHeight, string? filePath = null, int quality = 50)
         {
             using (Image image = Image.Load(imageData)) {
-                return GenerateThumbnailBytes(image, thumbnailWidth, thumbnailHeight, filePath);
+                return GenerateThumbnailBytes(image, thumbnailWidth, thumbnailHeight, filePath, quality);
             }
         }
         public static (int Width, int Height) GetImageDimensions(Image image) {

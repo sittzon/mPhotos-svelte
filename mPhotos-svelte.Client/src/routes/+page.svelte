@@ -13,6 +13,9 @@
     let currentAspectRatio: number = 1;
     let rowHeights: Array<number> = [];
     let chunkSize: number =  3;
+    let chunkSizesLarge: Array<number> =  [3,5,7,9,12];
+    let chunkSizesMedium: Array<number> =  [3,5,7,9];
+    let chunkSizesSmall: Array<number> =  [3,5,7];
     let photoModalIsOpen: boolean = false;
     let scrollToIndex: number;
 
@@ -48,18 +51,14 @@
         });
 
         // Add event listeners
-        document.getElementById("photoModal")?.addEventListener("click", closeModal);
+        // If background of photo modal is pressed, then close
+        window.onclick = (event) => {
+            const modal = document.getElementById("photoModal")
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
 
-        // Disable clicks on modal main image by stopping event propagation
-        document.getElementById('photoModalImage')?.addEventListener('click', (event) => {
-            event.stopPropagation();  // Prevent the click from reaching the background
-        });
-        document.getElementById('photoModalButtonPrev')?.addEventListener('click', (event) => {
-            event.stopPropagation();
-        });
-        document.getElementById('photoModalButtonNext')?.addEventListener('click', (event) => {
-            event.stopPropagation();
-        });
         document.addEventListener("keyup", keypress);
         window.addEventListener("resize", calcRowHeights);
         
@@ -137,9 +136,22 @@
     }
 
     const reChunk = (increaseChunkSize: boolean = false) => {
+        // Check window width
+        // Small screens should not have ability to have large chunk sizes
+        const windowInnerWidth = window.innerWidth;
+        let currentChunkSizeArray = chunkSizesSmall; 
+        if (windowInnerWidth > 1200) {
+            currentChunkSizeArray = chunkSizesLarge;
+        } else if (windowInnerWidth > 800) {
+            currentChunkSizeArray = chunkSizesMedium;
+        }
+        
         // Increase chunk size and chunk
         if (increaseChunkSize) {
-            chunkSize = chunkSize==3? 5 : chunkSize==5? 7: chunkSize==7? 9 : chunkSize==9? 12 : chunkSize==12? 3 : 3;
+            let index = currentChunkSizeArray.findIndex(x => x == chunkSize);
+            index += 1;
+            index %= currentChunkSizeArray.length;
+            chunkSize = currentChunkSizeArray[index];
             setCookie('chunkSize', chunkSize.toString());
         }
         chunkedPhotos = chunkPhotos(photosMeta, chunkSize);
@@ -173,6 +185,15 @@
     const updateAspectRatio = (currentPhoto: PhotoMetaClient) => {
         currentAspectRatio =    (currentPhoto.width? currentPhoto.width : 0) / 
                                 (currentPhoto.height? currentPhoto.height : 1);
+    }
+
+    const replaceModalWithOriginal = (currentPhoto: PhotoMetaClient) => {
+        const a = document.querySelector<HTMLImageElement>("#photoModalImage");
+        if (a?.src.includes('/medium'))
+        {
+            a?.setAttribute('src', "api/photos/"+currentPhoto.guid);
+            console.log("Image swapped with original")
+        }
     }
 
     const openModal = (photo: PhotoMetaClient, index: number) => {
@@ -216,6 +237,9 @@
             if (key.code=='Escape') {
                 closeModal();
             }
+            if (key.code=='Space') {
+                closeModal();
+            }
         }
     }
 
@@ -237,21 +261,28 @@
     </div>
 {/if}
 <div id="photoModal" style="display: none; justify-content: center; width: 100dvw; height: 100dvh; background-color: black; z-index: 100; align-items: center">
-    {#if currentPhoto}
-        <button id="photoModalButtonPrev" style="position: fixed; left: 20px; opacity: 70%; height: 3rem; width: 4rem; border-radius: 5px; z-index: 110;" on:click={prevPhoto}>
+    <div id="modal-content" style="justify-items: center; z-index: 110">
+        {#if currentPhoto}
+        <div style="display: flex; justify-content: center">
+            <p class="text-rounded-corners" style="top: 0px; opacity: 80%; margin-bottom: 0">{getDateFormattedLong(currentPhoto)}</p>
+        </div>
+        <button id="photoModalButtonPrev" style="position: fixed; left: 20px; top: 50%; opacity: 50%; height: 3rem; width: 4rem; border-radius: 5px" on:click={prevPhoto}>
             <img style="rotate: 180deg" src="/right-arrow.svg" width="16" alt=""/>
         </button>
         <img id="photoModalImage"  
-            src="api/photos/{currentPhoto.guid}"
+            src="api/photos/{currentPhoto.guid}/medium"
             alt={currentPhoto.dateTaken}
             style="max-height: 98dvh; max-width: 98vw; pointer-events: none; aspect-ratio: {currentAspectRatio}"
-            on:load={() => updateAspectRatio(currentPhoto)}
+            on:load={() => {
+                replaceModalWithOriginal(currentPhoto); 
+                updateAspectRatio(currentPhoto)}
+            }
         />
-        <button id="photoModalButtonNext"  style="position: fixed; right: 20px; opacity: 70%; height: 3rem; width: 4rem; border-radius: 5px; z-index: 110;" on:click={nextPhoto}>
+        <button id="photoModalButtonNext"  style="position: fixed; right: 20px; top: 50%; opacity: 50%; height: 3rem; width: 4rem; border-radius: 5px;" on:click={nextPhoto}>
             <img src="/right-arrow.svg" width="16" alt=""/>
         </button>
-        <p class="text-rounded-corners" style="position: fixed; z-index: 110; margin-top: 98dvh; opacity: 80%">{getDateFormattedLong(currentPhoto)}</p>
-     {/if}
+        {/if}
+    </div>
 </div>
 <div style="width: 100vw; height: 100dvh; background-color: black">
     <VirtualList 
@@ -263,7 +294,7 @@
     {scrollToIndex}
     scrollToAlignment="center"
     scrollToBehaviour="smooth"
-    overscanCount={chunkSize==3? 4 : chunkSize==5? 6 : chunkSize==7? 7 : chunkSize==9? 8 :chunkSize==12? 12 : 12 }
+    overscanCount={chunkSize==3? 7 : chunkSize==5? 7 : chunkSize==7? 7 : chunkSize==9? 7 :chunkSize==12? 9 : 9 }
     on:afterScroll={handleScroll}
     >
     <div slot="item" let:index let:style {style}>

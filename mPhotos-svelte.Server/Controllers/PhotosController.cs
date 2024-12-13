@@ -17,6 +17,7 @@ public class PhotosController : ControllerBase
     private readonly IMemoryCache _memoryCache;
     private readonly string _photosMetaCacheKey = "photosMeta";
     private readonly int _thumbnailSizeWidth = 300;
+    private readonly int _mediumSizeWidth = 2000;
 
     public PhotosController(IMemoryCache memoryCache)
     {
@@ -79,6 +80,8 @@ public class PhotosController : ControllerBase
                         int w = _thumbnailSizeWidth;
                         int h = (int)(aspectRatio/w);
                         var photoBytes = ImageHelper.GenerateThumbnailBytes(image, w, h, thumbnailRoot + "/" + photoMeta.Guid + ".webp");
+                        var photoMediumBytes = ImageHelper.GenerateThumbnailBytes(image, _mediumSizeWidth, (int)(aspectRatio/_mediumSizeWidth), 
+                            thumbnailRoot + "/" + photoMeta.Guid + "-medium.webp", quality: 99);
                     }
 
                     // Write to metadata file and add to metadata cache
@@ -149,6 +152,20 @@ public class PhotosController : ControllerBase
     public IActionResult GetThumbnail(string guid)
     {        
         var fileName = thumbnailRoot + "/" + guid + ".webp";
+        if (!System.IO.File.Exists(fileName)) {
+           return NotFound();
+        }
+
+        var b = System.IO.File.ReadAllBytes(fileName);
+        return File(b, "image/webp");
+    }
+
+    [HttpGet]
+    [Route("{guid}/medium")]
+    [ResponseCache(VaryByHeader = "User-Agent", Duration = 3600)]
+    public IActionResult GetMedium(string guid)
+    {        
+        var fileName = thumbnailRoot + "/" + guid + "-medium.webp";
         if (!System.IO.File.Exists(fileName)) {
            return NotFound();
         }

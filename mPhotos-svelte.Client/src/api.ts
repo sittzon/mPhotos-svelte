@@ -305,5 +305,19 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
         method: "GET",
         ...params,
       }),
+
+    /**
+     * No description
+     *
+     * @tags Photos
+     * @name MediumDetail
+     * @request GET:/Photos/{guid}/medium
+     */
+    mediumDetail: (guid: string, params: RequestParams = {}) =>
+      this.request<void, any>({
+        path: `/Photos/${guid}/medium`,
+        method: "GET",
+        ...params,
+      }),
   };
 }
