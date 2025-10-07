@@ -1,0 +1,1 @@
+export let memoryCache: Record<string, any> = {};

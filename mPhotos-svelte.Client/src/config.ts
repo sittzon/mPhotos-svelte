@@ -7,3 +7,5 @@ export const config =
         }
     }
 };
+
+export const THUMBNAIL_ROOT = './thumbs/'; //process.env.THUMBNAIL_ROOT || '/thumbs';

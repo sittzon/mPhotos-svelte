@@ -3,6 +3,7 @@
     import { Api, type PhotoMetaClient } from "../api";
     import { config } from "../config";
 	import VirtualList from 'svelte-tiny-virtual-list';
+    import PhotoSlider from '../lib/components/PhotoSlider.svelte';
 
     let virtualList;
     let photosMeta : Array<PhotoMetaClient> = [];
@@ -11,6 +12,7 @@
     let currentDate: string = "";
     let currentPhotoIndex: number = 0;
     let currentAspectRatio: number = 1;
+    let current10Photos: Array<string> = [];
     let rowHeights: Array<number> = [];
     let chunkSize: number =  3;
     let chunkSizesLarge: Array<number> =  [3,5,7,9,12];
@@ -18,36 +20,43 @@
     let chunkSizesSmall: Array<number> =  [3,5,7];
     let photoModalIsOpen: boolean = false;
     let scrollToIndex: number;
+    let windowHeight: number = 1000;
 
     const months = [ "January", "February", "March", "April", "May", "June", 
            "July", "August", "September", "October", "November", "December" ];
 
     onMount(async () =>
     {
+        windowHeight = window.innerHeight;
+
         // Set chunkSize according too cookie value
         const tempChunkSize = getCookie('chunkSize');
         chunkSize = tempChunkSize? +tempChunkSize : chunkSize;
 
         // Fetch metadata        
-        const dbMetadataList = "/api/metadatalist"
+        // const dbMetadataList = "/api/metadatalist"
+        const dbMetadataList = "/api/photos/new"
         
-        const request = fetch(dbMetadataList, {
+        await fetch(dbMetadataList, {
             method: 'GET',
             headers: {
                 'content-type': 'application/json'
             }
-        });
-        await request
+        })
         .then((response) => {
-            if (response.status == 200)
-            {
+            if (response.ok) {
                 return response.json();
+            } else {
+                console.error("Failed to fetch photo metadata, status:", response.status);
+                return [];
             }
         })
         .then((data) => {
             photosMeta = data;
-            reChunk();
-            currentDate = getDateFormattedShort(photosMeta[0]);
+            if (photosMeta.length > 0) {
+                reChunk();
+                currentDate = getDateFormattedShort(photosMeta[0]);
+            }
         });
 
         // Add event listeners
@@ -61,6 +70,18 @@
 
         document.addEventListener("keyup", keypress);
         window.addEventListener("resize", calcRowHeights);
+
+
+        // Show elements again immediately on user action
+        ['click', 'touchstart', 'mousemove'].forEach(event => {
+            document.addEventListener(event, () => {
+                const els = document.getElementsByClassName('fadeout');
+                Array.from(els).forEach(el => {
+                    el.style.opacity = '1';  // instantly show
+                    resetFade(el);             // restart fade timer
+                });
+            });
+        });
         
         // Register service worker
         // if ('serviceWorker' in navigator) {
@@ -84,10 +105,11 @@
         document.cookie = key + '=' + value;
     }
 
-    // Needed because Chrome does not apply rotation to images according to image metadata, Safari does
-    const isChrome = () => {
-        const userAgent = navigator.userAgent.toLowerCase();
-        return userAgent.includes('chrome') && !userAgent.includes('edg'); // Edge also uses 'chrome' in its UA string
+    const resetFade = (el: HTMLElement) => {
+        // Reset the animation by removing and re-adding the class
+        el.classList.remove('fadeout');
+        void el.offsetWidth; // forces reflow so the animation can restart
+        el.classList.add('fadeout');
     }
     
     const handleScroll = (e: Event) => {
@@ -118,7 +140,12 @@
         if (photo == null || photo.dateTaken == null) {
             return "";
         }
-        return photo.dateTaken.split('T')[0] + ' ' + photo.dateTaken.split('T')[1];
+        // error-no-date-found
+        if (photo.dateTaken.split('T')[1] == null) {
+            return photo.dateTaken.split('T')[0];
+        }
+
+        return photo.dateTaken.split('T')[0] + ' ' + photo.dateTaken.split('T')[1].split('.')[0];
     }
 
     const getNoPhotosFormatted = () => {
@@ -174,44 +201,59 @@
                 if (chunk[n] && chunk[n].height && chunk[n].width) {
                     const aspectRatio = chunk[n].width / chunk[n].height;
                     const h = maxImgWidth / aspectRatio
+                    // Set a ceiling for max height, so that very high images do not take too much space
+                    // if (h > 300) {
+                    //     maxHeight = 300;
+                    // }
                     maxHeight = h > maxHeight? h : maxHeight;
                 }
             }
             const tallestHeight = maxHeight;
             rowHeights.push(+tallestHeight.toFixed(0));
         }
+
+        virtualList.recomputeSizes(0);
     }
 
     const updateAspectRatio = (currentPhoto: PhotoMetaClient) => {
         currentAspectRatio =    (currentPhoto.width? currentPhoto.width : 0) / 
                                 (currentPhoto.height? currentPhoto.height : 1);
+        console.log("Aspect ratio updated to", currentAspectRatio);
     }
 
     const replaceModalWithOriginal = (currentPhoto: PhotoMetaClient) => {
         const a = document.querySelector<HTMLImageElement>("#photoModalImage");
         if (a?.src.includes('/medium'))
         {
-            a?.setAttribute('src', "api/photos/"+currentPhoto.guid);
+            // TODO: return original image instead of medium
+            a?.setAttribute('src', "api/photos/new/"+currentPhoto.guid+"/medium");
             console.log("Image swapped with original")
         }
     }
 
     const openModal = (photo: PhotoMetaClient, index: number) => {
+        document.getElementById("virtual-list-container")?.style.setProperty("display", "none");
         currentPhoto = photo;
         currentPhotoIndex = index;
         updateAspectRatio(photo);
-        document.getElementById("photoModal")?.style.setProperty("display", "flex");
+        document.getElementById("photoModal")?.style.setProperty("display", "block");
         // Disable scrolling
         document.body.style.overflow = 'hidden';
+        current10Photos = [];
+        for (let i = 0; i < 10; i++) {
+            current10Photos.push({full:'api/photos/new/' + photosMeta[currentPhotoIndex + i].guid + "/medium", thumb:"api/photos/new/" + photosMeta[currentPhotoIndex + i].guid + "/thumb"});
+        }
+        // console.log("Current 10 photos:", current10Photos);
         photoModalIsOpen = true;
     }
 
     const closeModal = () => {
+        document.getElementById("virtual-list-container")?.style.removeProperty("display");
         document.getElementById("photoModal")?.style.setProperty("display", "none");
         // Enable scrolling
         document.body.style.overflow = '';
         photoModalIsOpen = false;
-        // scrollToIndex = currentPhotoIndex;
+        scrollToIndex = currentPhotoIndex;
     }
 
     const nextPhoto = () => {
@@ -263,56 +305,81 @@
 <div id="photoModal" style="display: none; justify-content: center; width: 100dvw; height: 100dvh; background-color: black; z-index: 100; align-items: center">
     <div id="modal-content" style="justify-items: center; z-index: 110">
         {#if currentPhoto}
-        <div style="display: flex; justify-content: center">
+        <div style="display: flex; justify-content: center" class="fadeout">
             <p class="text-rounded-corners" style="top: 0px; opacity: 80%; margin-bottom: 0">{getDateFormattedLong(currentPhoto)}</p>
         </div>
-        <button id="photoModalButtonPrev" style="position: fixed; left: 20px; top: 50%; opacity: 50%; height: 3rem; width: 4rem; border-radius: 5px" on:click={prevPhoto}>
+        <!-- <button id="photoModalButtonPrev" class="fadeout" style="position: fixed; left: 20px; top: 50%; opacity: 50%; height: 3rem; width: 4rem; border-radius: 5px" on:click={prevPhoto}>
             <img style="rotate: 180deg" src="/right-arrow.svg" width="16" alt=""/>
-        </button>
-        <img id="photoModalImage"  
-            src="api/photos/{currentPhoto.guid}/medium"
+        </button> -->
+        <!-- <img id="photoModalImage"  
+            src="api/photos/new/{currentPhoto.guid}/medium"
             alt={currentPhoto.dateTaken}
-            style="max-height: 98dvh; max-width: 98vw; pointer-events: none; aspect-ratio: {currentAspectRatio}"
+            style="max-height: 98dvh; max-width: 98vw; pointer-events: none;"
             on:load={() => {
-                replaceModalWithOriginal(currentPhoto); 
-                updateAspectRatio(currentPhoto)}
+                // replaceModalWithOriginal(currentPhoto); 
+                updateAspectRatio(currentPhoto);
             }
-        />
-        <button id="photoModalButtonNext"  style="position: fixed; right: 20px; top: 50%; opacity: 50%; height: 3rem; width: 4rem; border-radius: 5px;" on:click={nextPhoto}>
+            }
+        /> -->
+        <PhotoSlider images={current10Photos} closeModal={closeModal}/>
+        <!-- <button id="photoModalButtonNext" class="fadeout" style="position: fixed; right: 20px; top: 50%; opacity: 50%; height: 3rem; width: 4rem; border-radius: 5px;" on:click={nextPhoto}>
             <img src="/right-arrow.svg" width="16" alt=""/>
-        </button>
+        </button> -->
         {/if}
     </div>
 </div>
-<div style="width: 100vw; height: 100dvh; background-color: black">
+<!-- <p style="position: fixed; top: 10px; right: 20px; z-index: 2; background: rgba(255,255,255,0.7); border-radius: 3px; padding: 0 6px;">
+    Chunkedphotos length: {chunkedPhotos.length}
+    rowHeights: {rowHeights.length}
+</p> -->
+<div id="virtual-list-container" style="
+">
+<!-- width: 100vw; height: 100dvh; background-color: black -->
     <VirtualList 
     bind:this={virtualList}
-    width="100vw" 
-    height="100vh" 
+    width="100%" 
+    height={windowHeight}
     itemCount={chunkedPhotos.length} 
     itemSize={rowHeights}
+    {...{/*
     {scrollToIndex}
     scrollToAlignment="center"
     scrollToBehaviour="smooth"
     overscanCount={chunkSize==3? 7 : chunkSize==5? 7 : chunkSize==7? 7 : chunkSize==9? 7 :chunkSize==12? 9 : 9 }
+    */}}
     on:afterScroll={handleScroll}
     >
+
     <div slot="item" let:index let:style {style}>
-            <table style="width: 100%; height: {rowHeights[index]}px">
-                <tr>
+            <table 
+
+            style="width: 100%;"
+
+            >
+                <tr style="
+                    text-align:center"
+                >
+                <!-- {index==0? 'text-align: left;' : '' }
+                {index==chunkSize-1? 'text-align: right;' : '' } -->
                 {#each chunkedPhotos[index] as currentPhotoMeta, itemIndex}
-                    <td style="width: {chunkSize==3? '33vw' : chunkSize==5? '20vw' : '14vw' }; height: 100%; text-align: center">
+                <td style="
+                    "
+                    >
+                    <!-- "width: {chunkSize==3? '33vw' : chunkSize==5? '20vw' : '14vw' }; height: 100%; text-align: center" -->
                         <a on:click={() => openModal(currentPhotoMeta, index*chunkSize + itemIndex)} href='/'>
                             <img 
                             id={currentPhotoMeta.guid}
-                            src="api/photos/{currentPhotoMeta.guid}/thumb"
+                            src="api/photos/new/{currentPhotoMeta.guid}/thumb"
                             alt={currentPhotoMeta.dateTaken}
                             style="
-                            width: 100%
-                            ;rotate: {isChrome() && currentPhotoMeta.width / currentPhotoMeta.height < 1.0? '90deg' : ''}
+                                height: 100%;
+                                max-height: {rowHeights[index]-2}px;
+                                max-width: {chunkSize==3? '33vw' : chunkSize==5? '20vw' : '14vw' };
+                                border-radius: 5px;
                             "
                             >
-                            <!-- ;height: 100% -->
+                            <!-- ;max-height: 100% -->
+                            <!-- max-height: {rowHeights[index]}px; -->
                             <!-- max-width: {chunkSize==3? '33vw' : chunkSize==5? '20vw' : '14vw' } -->
                         </a>
                     </td>
@@ -320,6 +387,7 @@
                 </tr>
             </table>
         </div>
+
     </VirtualList>
 </div>
 
@@ -329,6 +397,18 @@
         width: fit-content;
         border-radius: 3px;
         padding: 0 3px 0 3px;
+    }
+
+    .fadeout {
+        opacity: 1;
+        animation: fadeout 1s ease forwards;
+        animation-delay: 2s;
+    }
+
+    @keyframes fadeout {
+        to {
+            opacity: 0;
+        }
     }
 
 </style>
