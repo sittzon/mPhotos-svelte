@@ -1,11 +1,11 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import fs from 'fs/promises';
 import path from 'path';
-import { THUMBNAIL_ROOT } from '../../../../../../config';
+import { config } from '../../../../../../config';
 
 export const GET: RequestHandler = async ({ params }) => {
     const guid = params.guid as string;
-    const fileName = path.join(THUMBNAIL_ROOT, guid + '.webp');
+    const fileName = path.join(config.GENERATED_THUMBNAILS, guid + '.webp');
     const exists = await fs.stat(fileName).then(() => true).catch(() => false);
     if (!exists) return new Response('Not found', { status: 404 });
     const b = await fs.readFile(fileName);

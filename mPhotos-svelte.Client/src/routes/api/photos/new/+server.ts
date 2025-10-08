@@ -1,25 +1,21 @@
-// Translated from PhotosController.cs
 import type { RequestHandler } from '@sveltejs/kit';
 import fs from 'fs/promises';
 import path from 'path';
-import sharp from 'sharp';
-import crypto from 'crypto';
-import { THUMBNAIL_ROOT } from '../../../../config';
+import { config } from '../../../../config';
 import type { PhotoMeta, PhotoMetaClient } from '../../../../helpers/interfaces';
 import { getImageDimensions, getDateTaken, getHashString, generateThumbnailBytes } from '../../../../helpers/imagehelper';
 import { getFileInfosRecursively, photosMetaCacheKey } from '../../../../helpers/filehelper';
 import { memoryCache } from '../../../../helpers/memorycache';
 
-const photosRoot = '';
-const metaDataFilename = path.join(THUMBNAIL_ROOT, 'metadata.json');
-const errorLogFilename = path.join(THUMBNAIL_ROOT, 'errors.log');
-const thumbnailSizeWidth = 300;
-const mediumSizeWidth = 1200;
+const metaDataFilename = path.join(config.GENERATED_THUMBNAILS, config.METADATA_FILE || 'metadata.json');
+const errorLogFilename = path.join(config.GENERATED_THUMBNAILS, config.ERRORS_FILE || 'errors.log');
+const thumbnailSizeWidth = config.THUMBNAIL_SIZE || 300;
+const mediumSizeWidth = config.MEDIUM_SIZE || 1200;
 
 // Load photos (async, simplified)
 async function loadPhotos() {
     if (!memoryCache[photosMetaCacheKey]) {
-        let originalPhotos = await getFileInfosRecursively(photosRoot);
+        let originalPhotos = await getFileInfosRecursively(config.ORIGINAL_PHOTOS);
         originalPhotos = originalPhotos.filter(x => x.Extension.toLowerCase() === '.jpg' || x.Extension.toLowerCase() === '.jpeg');
 
         let photoMetadata: PhotoMeta[] = [];
@@ -54,7 +50,7 @@ async function loadPhotos() {
                 photoMetadata.sort((a, b) => a.dateTaken.localeCompare(b.dateTaken));
 
                 // Only generate thumbnail if not found on disk
-                const thumbPath = path.join(THUMBNAIL_ROOT, photoMeta.guid + '.webp');
+                const thumbPath = path.join(config.GENERATED_THUMBNAILS, photoMeta.guid + '.webp');
                 const thumbExists = await fs.stat(thumbPath).then(() => true).catch(() => false);
                 if (!thumbExists) {
                     const aspectRatio = photoMeta.width / photoMeta.height;
@@ -63,12 +59,12 @@ async function loadPhotos() {
                     await generateThumbnailBytes(bytes, w, h, thumbPath);
                 }
                 
-                const mediumPath = path.join(THUMBNAIL_ROOT, photoMeta.guid + '-medium.webp');
+                const mediumPath = path.join(config.GENERATED_THUMBNAILS, photoMeta.guid + '-medium.webp');
                 const mediumExists = await fs.stat(mediumPath).then(() => true).catch(() => false);
                 if (!mediumExists) {
                     await generateThumbnailBytes(bytes, mediumSizeWidth, Math.floor(photoMeta.height * (mediumSizeWidth / photoMeta.width)), mediumPath, 99);
                 }
-
+                
                 memoryCache[photosMetaCacheKey] = photoMetadata;
                 i = (i + 1) % 50;
                 if (i === 0) {

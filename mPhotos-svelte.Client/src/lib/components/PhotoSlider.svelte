@@ -1,23 +1,37 @@
 <script>
   import { onMount } from "svelte";
 
-  export let images = []; // [{ full, thumb }]
+  export let images = [];
   export let closeModal = () => {};
+  export let photoIndex = 0; // Start index
 
-  let current = 0;
-  let loaded = {}; // Track which full images are loaded
-  const nrToPreload = 1;
+  let current = photoIndex;
+  let loaded = {}; // Track which full photos are loaded
+  let currentPhoto = {};
+  let nextPhoto = {};
+  let prevPhoto = {};
+  const nrToPreload = 1; // Number of photos to preload on each side of current
+  const amountOfPixelsToClose = 200; // Pixels to drag before closing
+  const amountOfPixelsToActivateFade = 20; // Pixels to drag before begin fading
+  const amountOfPixelsToSwitchPhoto = 50; // Pixels to drag before switching photo
   
   onMount(() => {
-    document.addEventListener("keyup", keypress);
+    let current = photoIndex;
+    // console.log("current is now:", current);
+    document.addEventListener("keyup", keyPressUp);
 
     // Show elements again immediately on user action
     ['click', 'touchstart', 'mousemove'].forEach(event => {
         document.addEventListener(event, () => {
             const els = document.getElementsByClassName('fadeout');
+            const els5s = document.getElementsByClassName('fadeout5s');
             Array.from(els).forEach(el => {
                 el.style.opacity = '1';  // instantly show
-                resetFade(el);             // restart fade timer
+                resetFade(el);           // restart fade timer
+            });
+            Array.from(els5s).forEach(el => {
+                el.style.opacity = '1';  // instantly show
+                resetFade5s(el);         // restart fade timer
             });
         });
     });
@@ -30,7 +44,14 @@
       el.classList.add('fadeout');
   }
 
-  const keypress = (key) => {
+  const resetFade5s = (el) => {
+      // Reset the animation by removing and re-adding the class
+      el.classList.remove('fadeout5s');
+      void el.offsetWidth; // forces reflow so the animation can restart
+      el.classList.add('fadeout5s');
+  }
+
+  const keyPressUp = (key) => {
     // console.log(key.code)
     if (key.code=='ArrowRight') {
       next();
@@ -48,11 +69,22 @@
     }
   }
 
-  // Only load full images when within +/-3 of current index
-  const shouldPreload = (i) => {
+  const getDateFormattedLong = (photo) => {
+      if (photo == null || photo.dateTaken == null) {
+          return "";
+      }
+      // error-no-date-found
+      if (photo.dateTaken.split('T')[1] == null) {
+          return photo.dateTaken.split('T')[0];
+      }
+
+      return photo.dateTaken.split('T')[0] + ' ' + photo.dateTaken.split('T')[1].split('.')[0];
+  }
+
+  // Only load full photo when within +/-1 of current index
+  const shouldPreloadFull = (i) => {
     const total = images.length;
     const diff = Math.abs(i - current);
-    // console.log("shouldLoad check:", { i, current, diff, total });
     return (
       diff <= nrToPreload ||
       diff >= total - nrToPreload // Handle wrap-around
@@ -61,7 +93,6 @@
 
   const next = () => {
     current = (current + 1) % images.length;
-    console.log("current is now:", current);
     // Full photo is not loaded yet, load it
     if (!loaded[current+1] && current + 1 < images.length) {
       const nextPhotoSlide = document.getElementById(`photoslide-${current+1}`);
@@ -76,7 +107,6 @@
   
   const prev = () => {
     current = (current - 1 + images.length) % images.length;
-    console.log("current is now:", current);
     // Full photo is not loaded yet, load it
     if (!loaded[current-1] && current - 1 >= 0) {
       const prevPhotoSlide = document.getElementById(`photoslide-${current-1}`);
@@ -90,94 +120,117 @@
     }
   }
 
-  const goTo = (i) => {
-    current = i;
-  }
-
   // Touch handling
   let startX = 0;
+  let startY = 0;
   let dragging = false;
 
   const onTouchStart = (e) => {
     startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    const nextIndex = (current + 1) % images.length;
+    const prevIndex = (current - 1 + images.length) % images.length;
+    currentPhoto = document.getElementById(`photoslide-${current}`);
+    nextPhoto = document.getElementById(`photoslide-${nextIndex}`);
+    prevPhoto = document.getElementById(`photoslide-${prevIndex}`);
     dragging = true;
   }
 
   const onTouchMove = (e) => {
     if (!dragging) return;
-    const diff = startX - e.touches[0].clientX;
-    if (diff > 50) {
+    const diffX = startX - e.touches[0].clientX;
+    const diffY = startY - e.touches[0].clientY;
+    currentPhoto.style.transform = `translateX(${-diffX}px)`;
+    nextPhoto.style.transform = `translateX(${-diffX}px)`;
+    prevPhoto.style.transform = `translateX(${-diffX}px)`;
+    if (diffX > amountOfPixelsToSwitchPhoto) {
       next();
       dragging = false;
-    } else if (diff < -50) {
+    } else if (diffX < -amountOfPixelsToSwitchPhoto) {
       prev();
       dragging = false;
+    }
+    if(Math.abs(diffY) > amountOfPixelsToActivateFade) {
+      // Start dragging photo vertically
+      currentPhoto.style.transform = `translateY(${-diffY}px) scale(${1 - Math.abs(diffY)/1000}) rotate(${diffY/20}deg)`;
+      // currentPhoto.style.transition = 'transform 0s'; // Disable transition while dragging
+      nextPhoto.style.transform = `translateX(0)`;
+      prevPhoto.style.transform = `translateX(0)`;
+      const fadeByAmount = (amountOfPixelsToClose - Math.abs(diffY)) / amountOfPixelsToClose;
+      fadeElementByAmount(currentPhoto, fadeByAmount);
+      fadeElementByAmount(document.getElementById('slider'), fadeByAmount);
+      if(Math.abs(diffY) > amountOfPixelsToClose) {
+        // Vertical swipe, close modal
+        resetSlider();
+        closeModal();
+        dragging = false;
+      }
     }
   }
 
   const onTouchEnd = () => {
     dragging = false;
+    // Main photo back to center
+    currentPhoto.style.transform = ``;
+    nextPhoto.style.transform = ``;
+    prevPhoto.style.transform = ``;
+    if (currentPhoto.style.opacity < 1) {
+      fadeElementByAmount(currentPhoto, 100);
+      fadeElementByAmount(document.getElementById('slider'), 100);
+      // currentPhoto.style.transition = 'transform 0.3s ease'; // Re-enable transform transition
+    }
+  }
+
+  const fadeElementByAmount = (el, amount) => {
+    el.style.opacity = `${amount}`;
   }
 
   const resetSlider = () => {
     current = 0;
     startX = 0;
+    startY = 0;
     loaded = {};
     dragging = false;
   }
 </script>
 
-<div class="slider" on:touchstart={onTouchStart} on:touchmove={onTouchMove} on:touchend={onTouchEnd}>
+<div id="slider" on:touchstart={onTouchStart} on:touchmove={onTouchMove} on:touchend={onTouchEnd}>
   <div class="arrow left fadeout" on:click={prev}>‹</div>
   <div class="arrow right fadeout" on:click={next}>›</div>
   <div class="close-button fadeout" on:click={() => { resetSlider(); closeModal(); }}>✖</div>
 
+  <div class="text-rounded-corners date fadeout5s">
+      <p>{getDateFormattedLong(images[current])}</p>
+  </div>
   <div class="track" style="transform: translateX({-current * 100}%);">
     {#each images as img, i}
       <div class="slide">
         <img id="photoslide-{i}" 
-          class={shouldPreload(i) ? "full" + (loaded[i] ? ' visible' : '') : "thumb"} 
+          class={shouldPreloadFull(i) ? "full" + (loaded[i] ? ' visible' : '') : "thumb"} 
           src={
-            shouldPreload(i) ? img.full : img.thumb
+            shouldPreloadFull(i) ? img.full : img.thumb
           }
           alt="" 
           on:load={() => {
-            shouldPreload(i) && (loaded = { ...loaded, [i]: true });
+            shouldPreloadFull(i) && (loaded = { ...loaded, [i]: true });
           }}
         />
-
-        <!-- Full image fades in when loaded -->
-        <!-- {#if shouldPreload(i)}
-          <img
-            class="full {loaded[i] ? 'visible' : ''}"
-            src={img.full}
-            alt=""
-            on:load={() => {
-              loaded = { ...loaded, [i]: true };
-              console.log("Loaded full image:", i);
-            }}
-          />
-        {/if} -->
       </div>
     {/each}
   </div>
 </div>
 
-<!-- <div class="dots">
-  {#each images as _, i}
-    <div
-      class="dot {i === current ? 'active' : ''}"
-      on:click={() => goTo(i)}
-    ></div>
-  {/each}
-</div> -->
-
 <style>
-  .slider {
+  #slider {
     position: relative;
     overflow: hidden;
     width: 100%;
+    /* Prevent scrolling in either direction */
     touch-action: pan-y;
+    touch-action: pan-x;
+    overflow-x: hidden;
+    overflow-y: hidden;
+    z-index: 10;
   }
 
   .track {
@@ -189,7 +242,7 @@
   .slide {
     position: relative;
     min-width: 100%;
-    height: 100dvh; /* adjust as needed */
+    height: 100dvh;
     background: #000;
   }
 
@@ -199,7 +252,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    object-fit: contain; /* ✅ As requested */
+    object-fit: contain;
   }
 
   .thumb {
@@ -265,22 +318,31 @@
       }
   }
 
-  /* .dots {
-    display: flex;
-    justify-content: center;
-    gap: 6px;
-    padding-top: 8px;
+  .fadeout5s {
+      opacity: 1;
+      animation: fadeout 1s ease forwards;
+      animation-delay: 5s;
   }
 
-  .dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: #ccc;
-    cursor: pointer;
+  @keyframes fadeout5s {
+      to {
+          opacity: 0;
+      }
+  }
+  
+  .text-rounded-corners {
+      background-color: rgba(255,255,255,0.7);
+      width: fit-content;
+      border-radius: 3px;
+      padding: 0 3px 0 3px;
   }
 
-  .dot.active {
-    background: #333;
-  } */
+  .date {
+      position: fixed; 
+      z-index: 1; 
+      height: 25px;
+      top: 0px;
+      left: 50%;
+      transform: translate(-50%, 0);
+  }
 </style>

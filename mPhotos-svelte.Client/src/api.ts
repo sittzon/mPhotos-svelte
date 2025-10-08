@@ -29,6 +29,8 @@ export interface PhotoMetaClient {
   /** @format date-time */
   dateTaken?: string | null;
   name?: string | null;
+  thumb?: string | null;
+  full?: string | null;
 }
 
 export type QueryParamsType = Record<string | number, any>;
