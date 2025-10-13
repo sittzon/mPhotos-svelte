@@ -7,6 +7,7 @@ import { getImageDimensions, getDateTaken, getHashString, generateThumbnailBytes
 import { getFileInfosRecursively, photosMetaCacheKey } from '../../../../helpers/filehelper';
 import { memoryCache } from '../../../../helpers/memorycache';
 
+
 const metaDataFilename = path.join(config.GENERATED_THUMBNAILS, config.METADATA_FILE || 'metadata.json');
 const errorLogFilename = path.join(config.GENERATED_THUMBNAILS, config.ERRORS_FILE || 'errors.log');
 const thumbnailSizeWidth = config.THUMBNAIL_SIZE || 300;
@@ -16,7 +17,12 @@ const mediumSizeWidth = config.MEDIUM_SIZE || 1200;
 async function loadPhotos() {
     if (!memoryCache[photosMetaCacheKey]) {
         let originalPhotos = await getFileInfosRecursively(config.ORIGINAL_PHOTOS);
-        originalPhotos = originalPhotos.filter(x => x.Extension.toLowerCase() === '.jpg' || x.Extension.toLowerCase() === '.jpeg');
+        originalPhotos = originalPhotos.filter(x => x.Extension.toLowerCase() === '.jpg' 
+            || x.Extension.toLowerCase() === '.jpeg'
+            || x.Extension.toLowerCase() === '.heic'
+            || x.Extension.toLowerCase() === '.heif'
+            || x.Extension.toLowerCase() === '.png'
+        );
 
         let photoMetadata: PhotoMeta[] = [];
         try {
@@ -35,6 +41,7 @@ async function loadPhotos() {
         for (const fileInfo of originalPhotos) {
             try {
                 const bytes = await fs.readFile(fileInfo.FullName);
+                console.log(`Processing photo: ${fileInfo.FullName}`);
                 const [width, height] = await getImageDimensions(bytes);
                 const dateTaken = await getDateTaken(bytes) as string;
                 const photoMeta: PhotoMeta = {
@@ -50,19 +57,20 @@ async function loadPhotos() {
                 photoMetadata.sort((a, b) => a.dateTaken.localeCompare(b.dateTaken));
 
                 // Only generate thumbnail if not found on disk
+                const isHeic = fileInfo.Extension.toLowerCase() === '.heic' || fileInfo.Extension.toLowerCase() === '.heif';
                 const thumbPath = path.join(config.GENERATED_THUMBNAILS, photoMeta.guid + '.webp');
                 const thumbExists = await fs.stat(thumbPath).then(() => true).catch(() => false);
                 if (!thumbExists) {
                     const aspectRatio = photoMeta.width / photoMeta.height;
                     const w = thumbnailSizeWidth;
                     const h = Math.floor(photoMeta.height * (w / photoMeta.width));
-                    await generateThumbnailBytes(bytes, w, h, thumbPath);
+                    await generateThumbnailBytes(bytes, w, h, thumbPath, 80, isHeic);
                 }
                 
                 const mediumPath = path.join(config.GENERATED_THUMBNAILS, photoMeta.guid + '-medium.webp');
                 const mediumExists = await fs.stat(mediumPath).then(() => true).catch(() => false);
                 if (!mediumExists) {
-                    await generateThumbnailBytes(bytes, mediumSizeWidth, Math.floor(photoMeta.height * (mediumSizeWidth / photoMeta.width)), mediumPath, 99);
+                    await generateThumbnailBytes(bytes, mediumSizeWidth, Math.floor(photoMeta.height * (mediumSizeWidth / photoMeta.width)), mediumPath, 99, isHeic);
                 }
                 
                 memoryCache[photosMetaCacheKey] = photoMetadata;

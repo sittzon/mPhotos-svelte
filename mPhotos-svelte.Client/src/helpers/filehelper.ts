@@ -24,7 +24,12 @@ export async function getFileInfosRecursively(root: string): Promise<Array<{ Ful
                 await walk(fullPath);
             } else {
                 const ext = path.extname(file.name).toLowerCase();
-                if (ext === '.jpg' || ext === '.jpeg') {
+                if (ext === '.jpg' 
+                    || ext === '.jpeg'
+                    || ext === '.heic'
+                    || ext === '.heif'
+                    || ext === '.png'
+                ) {
                     const stat = await fs.stat(fullPath);
                     results.push({
                         FullName: fullPath,

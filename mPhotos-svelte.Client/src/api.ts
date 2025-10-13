@@ -30,6 +30,7 @@ export interface PhotoMetaClient {
   dateTaken?: string | null;
   name?: string | null;
   thumb?: string | null;
+  medium?: string | null;
   full?: string | null;
 }
 

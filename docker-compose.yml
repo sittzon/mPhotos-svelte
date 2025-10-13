@@ -24,8 +24,8 @@ services:
   #   volumes:
   #     - .:/app/events
   #     # Map originals folder, and area for thumbnails to be created
-  #     - /your/originals/here:/originals
-  #     - /your/thumbnails/here:/thumbs
+      - /Users/magnus/Desktop/mphotos-originals2:/originals
+      - /Users/magnus/Desktop/mphotos-thumbs-docker:/thumbs
   #     #macOS or Linux; Use %USERPROFILE% instead of {HOME} on Windows
   #     - ${HOME}/.aspnet/https:/https/
   #   environment:

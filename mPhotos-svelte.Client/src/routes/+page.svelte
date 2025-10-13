@@ -83,7 +83,8 @@
         // Add {full, thumb} information for PhotoSlider to use
         photosMeta.forEach(photo => {
             photo.thumb = "api/photos/new/" + photo.guid + "/thumb";
-            photo.full = "api/photos/new/" + photo.guid + "/medium";
+            photo.medium = "api/photos/new/" + photo.guid + "/medium";
+            photo.full = "api/photos/new/" + photo.guid;
         });
     });
 
@@ -201,54 +202,53 @@
     }
 </script>
 
-{#if !photoModalIsOpen}
-    <div class="text-rounded-corners" style="position: fixed; z-index: 1; right: 20px; top: 10px">
-        <button id="chunkButton" on:click={() => reChunk(true)}>chunkSize {chunkSize}</button>
-    </div>
-    <div class="text-rounded-corners current-date">
-        {#if photosMeta.length > 0}
-        <h3>{currentDate}</h3>
-        {/if}
-    </div>
-    <div class="text-rounded-corners no-photos">
-        {#if photosMeta.length > 0}
-            <p>{getNoPhotosFormatted()}</p>
-        {/if}
-    </div>
-{/if}
 {#if photoModalIsOpen}
-    <div id="photoModal">
-        <PhotoSlider images={photosMeta} photoIndex={currentPhotoIndex} closeModal={closeModal}/>
-    </div>
+<div id="photoModal">
+    <PhotoSlider photos={photosMeta} photoIndex={currentPhotoIndex} closeModal={closeModal}/>
+</div>
 {/if}
+
+<div class="text-rounded-corners chunk-button">
+    <button id="chunkButton" on:click={() => reChunk(true)}>chunkSize {chunkSize}</button>
+</div>
+<div class="text-rounded-corners current-date">
+    {#if photosMeta.length > 0}
+    <h3>{currentDate}</h3>
+    {/if}
+</div>
+<div class="text-rounded-corners no-photos">
+    {#if photosMeta.length > 0}
+        <p>{getNoPhotosFormatted()}</p>
+    {/if}
+</div>
 <div id="virtual-list-container">
     <VirtualList 
-    bind:this={virtualList}
-    width="100%" 
-    height={windowHeight}
-    itemCount={chunkedPhotos.length} 
-    itemSize={rowHeights}
-    on:afterScroll={handleScroll}
+        bind:this={virtualList}
+        width="100%" 
+        height={windowHeight}
+        itemCount={chunkedPhotos.length} 
+        itemSize={rowHeights}
+        on:afterScroll={handleScroll}
     >
 
     <div slot="item" let:index let:style {style}>
-            <table style="width: 100%; table-layout: fixed;">
-                <tr style="text-align:center;">
-                {#each chunkedPhotos[index] as currentPhotoMeta, itemIndex}
-                    <td style="">
-                        <a on:click={() => openModal(currentPhotoMeta, index*chunkSize + itemIndex)} href='/'>
-                            <img 
-                            id={currentPhotoMeta.guid}
-                            src="api/photos/new/{currentPhotoMeta.guid}/thumb"
-                            alt={currentPhotoMeta.dateTaken}
-                            style="max-height: {rowHeights[index]-2}px;"
-                            >
-                        </a>
-                    </td>
-                    {/each}
-                </tr>
-            </table>
-        </div>
+        <table style="width: 100%; table-layout: fixed;">
+            <tr style="text-align:center;">
+            {#each chunkedPhotos[index] as currentPhotoMeta, itemIndex}
+                <td style="">
+                    <a on:click={() => openModal(currentPhotoMeta, index*chunkSize + itemIndex)} href='/'>
+                        <img 
+                        id={currentPhotoMeta.guid}
+                        src="api/photos/new/{currentPhotoMeta.guid}/thumb"
+                        alt={currentPhotoMeta.dateTaken}
+                        style="max-height: {rowHeights[index]-2}px;"
+                        >
+                    </a>
+                </td>
+            {/each}
+            </tr>
+        </table>
+    </div>
 
     </VirtualList>
 </div>
@@ -278,10 +278,17 @@
         max-width: 100%;
     }
 
+    .chunk-button {
+        position: fixed; 
+        z-index: 1; 
+        right: 10px; 
+        top: 40px;
+    }
+
     .no-photos {
         position: fixed; 
         z-index: 1; 
-        left: 10px; 
+        right: 10px; 
         top: 10px; 
         height: 25px;
     }
@@ -290,7 +297,7 @@
         position: fixed; 
         z-index: 1; 
         left: 10px; 
-        top: 50px; 
+        top: 10px; 
         height: 35px
     }
 </style>
