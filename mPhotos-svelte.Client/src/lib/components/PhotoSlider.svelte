@@ -2,23 +2,26 @@
   import { onMount } from "svelte";
 
   export let photos = [];
-  export let closeModal = () => {};
-  export let photoIndex = 0; // Start index
+  export let closeModal = () => {}; // Feedback close to parent
+  export let photoIndex = 0; // Start index in photos array
 
-  let current = photoIndex;
-  let loaded = {}; // Track which full photos are loaded
-  let currentPhoto = {};
-  let nextPhoto = {};
-  let prevPhoto = {};
-  const nrToPreloadFull = 1; // Number of photos to preload full photo on each side of current
-  const nrToPreloadThumb = 3; // Number of photos to preload thumb on each side of current
+  let currentIndex = photoIndex;
+  $: prevIndex = wrap(currentIndex - 1);
+  $: nextIndex = wrap(currentIndex + 1);
+  $: currentPhoto = photos[currentIndex];
+  $: nextPhoto = photos[nextIndex];
+  $: prevPhoto = photos[prevIndex];
+  $: viewportWidth = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+  // const nrToPreloadFull = 1; // Number of photos to preload full photo on each side of current
+  // const nrToPreloadThumb = 3; // Number of photos to preload thumb on each side of current
+  let slideshowOpacity = 1; // Opacity of entire slideshow, used when dragging up/down to close
   const amountOfPixelsToClose = 100; // Pixels to drag before closing
   const amountOfPixelsForFadeout = 150; // Pixels to drag until opacity 100%
   const amountOfPixelsToActivateFade = 20; // Pixels to drag before begin fading
   const amountOfPixelsToSwitchPhoto = 50; // Pixels to drag before switching photo
-  
+
   onMount(() => {
-    let current = photoIndex;
+    currentIndex = photoIndex;
     // console.log("current is now:", current);
     document.addEventListener("keyup", keyPressUp);
     
@@ -41,6 +44,9 @@
       });
     });
   });
+
+  // Helper to wrap index around
+  const wrap = (i) => (i + photos.length) % photos.length;
   
   const resetFade = (el) => {
     // Reset the animation by removing and re-adding the class
@@ -86,43 +92,13 @@
     return photo.dateTaken.split('T')[0] + ' ' + photo.dateTaken.split('T')[1].split('.')[0];
   }
   
-  // Only load full photo when within +/-1 of current index
-  const shouldPreloadFull = (i) => {
-    const total = photos.length;
-    const diff = Math.abs(i - current);
-    return (
-      diff <= nrToPreloadFull ||
-      diff >= total - nrToPreloadFull // Handle wrap-around
-    );
-  }
-
-  const shouldPreloadThumb = (i) => {
-    const total = photos.length;
-    const diff = Math.abs(i - current);
-    return (
-      diff <= nrToPreloadThumb ||
-      diff >= total - nrToPreloadThumb // Handle wrap-around
-    );
-  }
-  
   const next = () => {
     scale = 1; // Reset scale on photo change
     translateX = 0;
     translateY = 0;
     lastTranslateX = 0;
     lastTranslateY = 0;
-    current = (current + 1) % photos.length;
-
-    // Ensure src is set to medium
-    const nextPhotoSlide = document.getElementById(`photoslide-${current}`);
-    nextPhotoSlide.src = photos[current].medium;
-
-    const nextIndex = (current + 1) % photos.length;
-    // Preload next photo if not loaded
-    if (!loaded[nextIndex]) {
-      const nextPhotoSlide = document.getElementById(`photoslide-${nextIndex}`);
-      nextPhotoSlide.src = photos[nextIndex].medium;
-    }
+    currentIndex = wrap(currentIndex + 1);
   }
   
   const prev = () => {
@@ -131,23 +107,15 @@
     translateY = 0;
     lastTranslateX = 0;
     lastTranslateY = 0;
-    current = (current - 1 + photos.length) % photos.length;
-      
-    // Ensure src is set to medium
-    let prevPhotoSlide = document.getElementById(`photoslide-${current}`);
-    prevPhotoSlide.src = photos[current].medium;
-      
-    // Preload previous photo if not loaded
-    const prevIndex = (current - 1 + photos.length) % photos.length;
-    if (!loaded[prevIndex]) {
-      prevPhotoSlide = document.getElementById(`photoslide-${prevIndex}`);
-      prevPhotoSlide.src = photos[prevIndex].medium;
-    }
+    currentIndex = wrap(currentIndex - 1);
   }
   
   // Touch handling
   let startX = 0;
   let startY = 0;
+  let diffX = 0; // For swiping between photos
+  let diffY = 0; // For swiping between photos
+  let rotate = 0; // For rotating when dragging up/down
   let startDistance = 0; // For pinch to zoom
   let scale = 1; // For pinch to zoom
   let lastScale = 1; // For pinch to zoom
@@ -155,7 +123,9 @@
   let translateY = 0; // For panning when zoomed
   let lastTranslateX = 0; // For panning when zoomed
   let lastTranslateY = 0; // For panning when zoomed
+  let animating = false; // Whether an animation is in progress
   let changingSlide = false; // Whether we are in the process of changing slide
+  let closingSlide = false; // Whether we are in the process of closing slide
   let closeOnTouchEnd = false; // Whether to close modal on touch end
   let nextOnTouchEnd = false; // Whether to go to next photo on touch end
   let prevOnTouchEnd = false; // Whether to go to previous photo on touch end
@@ -167,14 +137,7 @@
   }
 
   const onTouchStart = (e) => {
-    //startX = e.touches[0].clientX;
-    //startY = e.touches[0].clientY;
-    const nextIndex = (current + 1) % photos.length;
-    const prevIndex = (current - 1 + photos.length) % photos.length;
-    currentPhoto = document.getElementById(`photoslide-${current}`);
-    nextPhoto = document.getElementById(`photoslide-${nextIndex}`);
-    prevPhoto = document.getElementById(`photoslide-${prevIndex}`);
-    changingSlide = false;
+    animating = false;
 
     // Enable pinch to zoom on current photo
     if (e.touches.length === 2)
@@ -192,50 +155,55 @@
     // Pinch-to-zoom on current photo
     if (e.touches.length === 2) {
       const distance = getDistance(e.touches);
-      scale = Math.min(Math.max(lastScale * (distance / startDistance), 1), 3);
+      scale = Math.min(Math.max(lastScale * (distance / startDistance), 1), 4);
       //console.log("Scale:", scale);
       // Replace current photo src with fullsize img
-      currentPhoto.src = photos[current].full?? photos[current].medium;
-      console.log("Pinch zoom, scale:", scale);
+      currentPhoto.src = photos[currentIndex].full?? photos[currentIndex].medium;
+      // console.log("Pinch zoom, scale:", scale);
     }
     // One finger, drag to pan
     else if (e.touches.length === 1 && scale > 1.05)
     {
-      translateX = Math.min(Math.max(e.touches[0].clientX - startX, -100), 100);
-      translateY = Math.min(Math.max(e.touches[0].clientY - startY, -100), 100);
-      currentPhoto.style.transform = `scale(${scale}) translate(${translateX}px, ${translateY}px)`;
-      console.log("Translate:", translateX, translateY);
+      translateX = Math.min(Math.max(e.touches[0].clientX - startX, -200), 200);
+      translateY = Math.min(Math.max(e.touches[0].clientY - startY, -200), 200);
+      translateX /= 2; // Slow down panning
+      translateY /= 2;
+      // console.log("Translate:", translateX, translateY);
     }
     // One finger, swipe to change photo or up/down to close
     else
     {
       // scale = 1; // Reset scale if not pinching
-      const diffX = startX + lastTranslateX - e.touches[0].clientX;
-      const diffY = startY + lastTranslateY - e.touches[0].clientY;
-      currentPhoto.style.transform = `scale(${scale}) translateX(${-diffX}px)`;
-      nextPhoto.style.transform = `scale(${scale}) translateX(${-diffX}px)`;
-      prevPhoto.style.transform = `scale(${scale}) translateX(${-diffX}px)`;
+      diffX = startX + lastTranslateX - e.touches[0].clientX;
+      diffY = startY + lastTranslateY - e.touches[0].clientY;
 
       nextOnTouchEnd = false;
       prevOnTouchEnd = false;
+      // console.log("Diff:", diffX, diffY);
+      if (changingSlide) {
+        diffY = 0; // No vertical movement when changing slide
+      }
+      else if (closingSlide) {
+        diffX = 0; // No horizontal movement when closing slide
+      }
       // Go to next/prev photo if beyond threshold
-      if (diffX > amountOfPixelsToSwitchPhoto) {
+      if (!closingSlide && diffX > amountOfPixelsToSwitchPhoto) {
         changingSlide = true;
+        // diffY = 0; // No vertical movement when changing slide
         nextOnTouchEnd = true;
-      } else if (diffX < -amountOfPixelsToSwitchPhoto) {
+      } else if (!closingSlide && diffX < -amountOfPixelsToSwitchPhoto) {
         changingSlide = true;
+        // diffY = 0; // No vertical movement when changing slide
         prevOnTouchEnd = true;
       }
       // Drag vertically to close
       if(!changingSlide && Math.abs(diffY) > amountOfPixelsToActivateFade) {
         // Start dragging photo vertically
-        currentPhoto.style.transform = `translateY(${-diffY}px) scale(${1 - Math.abs(diffY)/1000}) rotate(${diffY/20}deg)`;
-        nextPhoto.style.transform = `translateX(0)`;
-        prevPhoto.style.transform = `translateX(0)`;
+        closingSlide = true;
+        scale = 1 - Math.abs(diffY)/1000;
+        rotate = diffY/20;
         const scaleFactor = 1.5; // above 1 to make fade slower
-        const fadeByAmount = scaleFactor * (amountOfPixelsForFadeout - Math.abs(diffY)) / amountOfPixelsForFadeout;
-        fadeElementByAmount(currentPhoto, fadeByAmount);
-        fadeElementByAmount(document.getElementById('slider'), fadeByAmount);
+        slideshowOpacity = scaleFactor * (amountOfPixelsForFadeout - Math.abs(diffY)) / amountOfPixelsForFadeout;
         if(Math.abs(diffY) > amountOfPixelsToClose) {
           closeOnTouchEnd = true;
         }
@@ -247,14 +215,19 @@
   }
 
   const onTouchEnd = () => {
+    diffX = 0;
+    diffY = 0;
+    animating = true;
     lastTranslateX = translateX;
     lastTranslateY = translateY;
     changingSlide = false;
+    closingSlide = false;
     // Main photo back to center
     if (scale <= 1) {
-      currentPhoto.style.transform = ``;
-      nextPhoto.style.transform = ``;
-      prevPhoto.style.transform = ``;
+      scale = 1;
+      rotate = 0;
+      translateX = 0;
+      translateY = 0;
     }
     if (closeOnTouchEnd) {
       closeOnTouchEnd = false;
@@ -265,38 +238,35 @@
     }
     else
     {
-      // currentPhoto.style.transition = 'transform 0.3s ease'; // Re-enable transform transition
-      fadeElementByAmount(currentPhoto, 100);
-      fadeElementByAmount(document.getElementById('slider'), 100);
+      slideshowOpacity = 1; // Reset opacity of entire slider undoing close
     }
 
     if (nextOnTouchEnd) {
       nextOnTouchEnd = false;
-      scale = 1; // Reset scale on photo change
+      scale = 1;
       startDistance = 0;
       lastTranslateX = 0;
       lastTranslateY = 0;
-      next();
-    }
-    if (prevOnTouchEnd) {
+      diffX = viewportWidth+10; // To move nextPhoto to center. 
+      // Switch to next photo after animation ends
+      setTimeout(() => { diffX = 0; animating = false; next();}, 400);
+    } else if (prevOnTouchEnd) {
       prevOnTouchEnd = false;
-      scale = 1; // Reset scale on photo change
+      scale = 1;
       startDistance = 0;
       lastTranslateX = 0;
       lastTranslateY = 0;
-      prev();
+      diffX = -viewportWidth-10; // To move prevPhoto to center. 
+      // Switch to prev photo after animation ends
+      setTimeout(() => { diffX = 0; animating = false; prev();}, 400);
     }
-  }
-
-  const fadeElementByAmount = (el, amount) => {
-    el.style.opacity = `${amount}`;
   }
 
   const resetSlider = () => {
-    current = 0;
+    currentIndex = 0;
     startX = 0;
     startY = 0;
-    loaded = {};
+    // loaded = {};
     scale = 1;
     startDistance = 0;
   }
@@ -308,30 +278,32 @@
   <div class="close-button fadeout" on:click={() => { resetSlider(); closeModal(); }}>✖</div>
 
   <div class="text-rounded-corners date fadeout5s">
-      <p>{getDateFormattedLong(photos[current])}</p>
+      <p>{getDateFormattedLong(photos[currentIndex])}</p>
   </div>
-  <div class="track" style="transform: translateX({-current * 100}%);">
-    {#each photos as img, i}
-      <div class="slide pinch-zoom">
-        <img id="photoslide-{i}" 
-          class={shouldPreloadFull(i) ? "full" + (loaded[i] ? ' visible' : '') : "thumb"} 
-          style="transform: scale({scale}) translate({translateX}px, {translateY}px);"
-          src={
-            shouldPreloadFull(i) ? img.medium : shouldPreloadThumb(i) ? img.thumb : ''
-          }
-          alt={img.dateTaken}
-          on:load={() => {
-            shouldPreloadFull(i) && (loaded = { ...loaded, [i]: true });
-          }}
-        />
-      </div>
-    {/each}
-  </div>
+    <div class="slideshow" style="opacity:{slideshowOpacity};">
+      <img 
+        src={prevPhoto.medium}
+        class='slide previous {animating ? 'animating' : ''}'
+        style="transform: scale(1) translateX({-diffX-viewportWidth-10}px);"
+        alt={prevPhoto.dateTaken}
+        /> 
+        <img 
+        src={currentPhoto.medium}
+        class='slide current {animating ? 'animating' : ''}'
+        style="transform: scale({scale}) translateX({-diffX+translateX}px) translateY({-diffY+translateY}px) rotate({rotate}deg);"
+        alt={currentPhoto.dateTaken}
+        /> 
+        <img 
+        src={nextPhoto.medium}
+        class='slide next {animating ? 'animating' : ''}'
+        style="transform: scale(1) translateX({-diffX+viewportWidth+10}px);"
+        alt={nextPhoto.dateTaken}
+      /> 
+    </div>
 </div>
 
 <style>
   #slider {
-    position: relative;
     overflow: hidden;
     width: 100%;
     /* Prevent scrolling in either direction */
@@ -342,45 +314,39 @@
     z-index: 10;
   }
 
-  .track {
-    display: flex;
+  .slideshow {
+    position: fixed;
+    z-index: 10;
     width: 100%;
-    transition: transform 0.3s ease;
+    height: 100dvh;
+    overflow: hidden;
+    background-color: black;
   }
 
   .slide {
-    position: relative;
-    min-width: 100%;
-    height: 100dvh;
-    background: #000;
-  }
-
-  .slide img {
     position: absolute;
-    top: 0;
-    left: 0;
+    top: 0; left: 0;
     width: 100%;
     height: 100%;
     object-fit: contain;
   }
 
-  .thumb {
-    filter: blur(5px);
-    transform: scale(0.97);
-    width: 100%
+  .current {
+    z-index: 11;
   }
 
-  .full {
-    opacity: 0;
-    transition: opacity 0.5s ease;
+  .previous,
+  .next {
+    z-index: 11;
   }
 
-  .full.visible {
-    opacity: 1;
+  .animating {
+    transition: transform 0.4s cubic-bezier(0.22, 0.61, 0.36, 1);
   }
 
   .arrow {
     position: absolute;
+    z-index: 20;
     top: 50%;
     transform: translateY(-50%);
     background: rgba(255,255,255,0.6);
@@ -393,13 +359,13 @@
     cursor: pointer;
     user-select: none;
     font-size: 20px;
-    z-index: 10;
   }
 
   .arrow.left { left: 8px; }
   .arrow.right { right: 8px; }
   .close-button {
     position: absolute;
+    z-index: 20;
     top: 16px;
     right: 16px;
     background: rgba(255,255,255,0.6);
@@ -412,7 +378,6 @@
     cursor: pointer;
     user-select: none;
     font-size: 20px;
-    z-index: 10;
   }
   
   .fadeout {
@@ -440,6 +405,7 @@
   }
   
   .text-rounded-corners {
+      z-index: 20;
       background-color: rgba(255,255,255,0.7);
       width: fit-content;
       border-radius: 3px;
@@ -448,16 +414,10 @@
 
   .date {
       position: fixed; 
-      z-index: 1; 
+      z-index: 20; 
       height: 25px;
       top: 0px;
       left: 50%;
       transform: translate(-50%, 0);
-  }
-
-  .pinch-zoom {
-    touch-action: none;
-    overflow: hidden;
-    display: inline-block;
   }
 </style>
