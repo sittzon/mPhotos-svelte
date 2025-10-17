@@ -1,4 +1,11 @@
 .DS_Store
-mPhotos-svelte.Server/obj/**
-mPhotos-svelte.Server/bin/**
-*/thumbs
+/node_modules
+/build
+/.svelte-kit
+/package
+.env
+.env.*
+!.env.example
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+/thumbs

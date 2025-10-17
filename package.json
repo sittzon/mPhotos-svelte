@@ -3,7 +3,6 @@
 	"version": "0.0.1",
 	"private": true,
 	"scripts": {
-		"generate-api-classes": "npx tsx ./src/generateApiClasses.ts",
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",

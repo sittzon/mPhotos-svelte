@@ -31,7 +31,7 @@
         chunkSize = tempChunkSize? +tempChunkSize : chunkSize;
 
         // Fetch metadata
-        const dbMetadataList = "/api/photos/new"
+        const dbMetadataList = "/api/photos"
         
         await fetch(dbMetadataList, {
             method: 'GET',
@@ -82,9 +82,9 @@
 
         // Add {full, thumb} information for PhotoSlider to use
         photosMeta.forEach(photo => {
-            photo.thumb = "api/photos/new/" + photo.guid + "/thumb";
-            photo.medium = "api/photos/new/" + photo.guid + "/medium";
-            photo.full = "api/photos/new/" + photo.guid;
+            photo.thumb = "api/photos/" + photo.guid + "/thumb";
+            photo.medium = "api/photos/" + photo.guid + "/medium";
+            photo.full = "api/photos/" + photo.guid;
         });
     });
 
@@ -179,7 +179,7 @@
             // Calculate minimum aspect ratio for current row/chunk
             for (let n = 0; n < chunk.length; ++n) {
                 if (chunk[n] && chunk[n].height && chunk[n].width) {
-                    const aspectRatio = chunk[n].width / chunk[n].height;
+                    const aspectRatio = (chunk[n].width ?? 1) / (chunk[n].height ?? 1);
                     const h = maxImgWidth / aspectRatio;
                     maxHeight = h > maxHeight? h : maxHeight;
                 }
@@ -239,7 +239,7 @@
                     <a on:click={() => openModal(currentPhotoMeta, index*chunkSize + itemIndex)} href='/'>
                         <img 
                         id={currentPhotoMeta.guid}
-                        src="api/photos/new/{currentPhotoMeta.guid}/thumb"
+                        src="api/photos/{currentPhotoMeta.guid}/thumb"
                         alt={currentPhotoMeta.dateTaken}
                         style="max-height: {rowHeights[index]-2}px;"
                         >

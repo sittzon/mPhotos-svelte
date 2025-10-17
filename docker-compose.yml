@@ -4,33 +4,10 @@ services:
     container_name: mPhotos-svelte
     build:
       context: .
-      dockerfile: ./Dockerfile.client
+      dockerfile: ./Dockerfile
     ports:
       - 5174:5174
-    # depends_on:
-    #   - server
-    # environment:
-    #   - NODE_TLS_REJECT_UNAUTHORIZED=0
-
-  # server:
-  #   image: mphotos-svelte.server
-  #   container_name: mPhotos-svelte.server
-  #   mem_limit: 4g
-  #   build:
-  #     context: .
-  #     dockerfile: ./Dockerfile.server
-  #   ports:
-  #     - 7217:443
-  #   volumes:
-  #     - .:/app/events
-  #     # Map originals folder, and area for thumbnails to be created
-      - /Users/magnus/Desktop/mphotos-originals2:/originals
-      - /Users/magnus/Desktop/mphotos-thumbs-docker:/thumbs
-  #     #macOS or Linux; Use %USERPROFILE% instead of {HOME} on Windows
-  #     - ${HOME}/.aspnet/https:/https/
-  #   environment:
-  #     - ASPNETCORE_ENVIRONMENT=Development
-  #     - ASPNETCORE_URLS=https://+;http://+
-  #     - ASPNETCORE_HTTPS_PORT=7217
-  #     - ASPNETCORE_Kestrel__Certificates__Default__Password=password
-  #     - ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx
+    volumes:
+      # Map originals folder, and area for thumbnails to be created
+      - :/originals
+      - :/thumbs

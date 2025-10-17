@@ -1,11 +1,11 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import fs from 'fs/promises';
 import path from 'path';
-import { config } from '../../../../config';
-import type { PhotoMeta, PhotoMetaClient } from '../../../../helpers/interfaces';
-import { getImageDimensions, getDateTaken, getHashString, generateThumbnailBytes } from '../../../../helpers/imagehelper';
-import { getFileInfosRecursively, photosMetaCacheKey } from '../../../../helpers/filehelper';
-import { memoryCache } from '../../../../helpers/memorycache';
+import { config } from '../../../config';
+import type { PhotoMeta, PhotoMetaClient } from '../../../helpers/interfaces';
+import { getImageDimensions, getDateTaken, getHashString, generateThumbnailBytes } from '../../../helpers/imagehelper';
+import { getFileInfosRecursively, photosMetaCacheKey } from '../../../helpers/filehelper';
+import { memoryCache } from '../../../helpers/memorycache';
 
 
 const metaDataFilename = path.join(config.GENERATED_THUMBNAILS, config.METADATA_FILE || 'metadata.json');
@@ -87,7 +87,7 @@ async function loadPhotos() {
     }
 }
 
-// GET /api/photos/new/metadata
+// GET /api/photos/metadata
 export const GET: RequestHandler = async ({ url }) => {
     await loadPhotos();
     const photos: PhotoMeta[] = memoryCache[photosMetaCacheKey] || [];
