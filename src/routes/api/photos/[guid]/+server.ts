@@ -1,6 +1,6 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import fs from 'fs/promises';
-import { guidToLocation } from '../../../../helpers/filehelper';
+import { guidToLocation } from '$helpers/filehelper';
 
 export const GET: RequestHandler = async ({ params }) => {
     const guid = params.guid as string;

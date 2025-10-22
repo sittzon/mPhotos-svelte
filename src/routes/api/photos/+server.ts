@@ -1,19 +1,18 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import fs from 'fs/promises';
 import path from 'path';
-import { config } from '../../../config';
-import type { PhotoMeta, PhotoMetaClient } from '../../../helpers/interfaces';
-import { getImageDimensions, getDateTaken, getHashString, generateThumbnailBytes } from '../../../helpers/imagehelper';
-import { getFileInfosRecursively, photosMetaCacheKey } from '../../../helpers/filehelper';
-import { memoryCache } from '../../../helpers/memorycache';
-
+import { config } from '$config';
+import type { PhotoMeta, PhotoMetaClient } from '$helpers/interfaces';
+import { getImageDimensions, shutdownExifTool, getHashString, generateThumbnailBytes, getDateTakenFromPath } from '$helpers/imagehelper';
+import { getFileInfosRecursively, photosMetaCacheKey } from '$helpers/filehelper';
+import { memoryCache } from '$helpers/memorycache';
 
 const metaDataFilename = path.join(config.GENERATED_THUMBNAILS, config.METADATA_FILE || 'metadata.json');
 const errorLogFilename = path.join(config.GENERATED_THUMBNAILS, config.ERRORS_FILE || 'errors.log');
 const thumbnailSizeWidth = config.THUMBNAIL_SIZE || 300;
 const mediumSizeWidth = config.MEDIUM_SIZE || 1200;
 
-// Load photos (async, simplified)
+// Load photos
 async function loadPhotos() {
     if (!memoryCache[photosMetaCacheKey]) {
         let originalPhotos = await getFileInfosRecursively(config.ORIGINAL_PHOTOS);
@@ -41,9 +40,9 @@ async function loadPhotos() {
         for (const fileInfo of originalPhotos) {
             try {
                 const bytes = await fs.readFile(fileInfo.FullName);
-                console.log(`Processing photo: ${fileInfo.FullName}`);
                 const [width, height] = await getImageDimensions(bytes);
-                const dateTaken = await getDateTaken(bytes) as string;
+                // const dateTaken = await getDateTaken(bytes) as string;
+                const dateTaken = await getDateTakenFromPath(fileInfo.FullName) as string;
                 const photoMeta: PhotoMeta = {
                     dateTaken: dateTaken,
                     guid: getHashString(fileInfo.FullName),
@@ -73,7 +72,10 @@ async function loadPhotos() {
                     await generateThumbnailBytes(bytes, mediumSizeWidth, Math.floor(photoMeta.height * (mediumSizeWidth / photoMeta.width)), mediumPath, 99, isHeic);
                 }
                 
+                // Update in-memory cache
                 memoryCache[photosMetaCacheKey] = photoMetadata;
+
+                // Only write to file every 50th photo to reduce disk writes
                 i = (i + 1) % 50;
                 if (i === 0) {
                     await fs.writeFile(metaDataFilename, JSON.stringify(photoMetadata));
@@ -82,6 +84,7 @@ async function loadPhotos() {
                 await fs.appendFile(errorLogFilename, `Error loading photo: ${fileInfo.FullName}. Exception: ${e}\n`);
             }
         }
+        shutdownExifTool(); // Runs exiftool.end() to close child processes.
         memoryCache[photosMetaCacheKey] = photoMetadata;
         await fs.writeFile(metaDataFilename, JSON.stringify(photoMetadata));
     }
@@ -98,6 +101,14 @@ export const GET: RequestHandler = async ({ url }) => {
         sizeKb: x.sizeKb,
         width: x.width,
         height: x.height
-    })).sort((a, b) => b.dateTaken.localeCompare(a.dateTaken));
+    }))
+    .sort((a, b) => {
+        // Push any "error-no-date-found" entries to the end
+        if (a.dateTaken === 'error-no-date-found' && b.dateTaken !== 'error-no-date-found') return 1;
+        if (b.dateTaken === 'error-no-date-found' && a.dateTaken !== 'error-no-date-found') return -1;
+
+        // Otherwise, normal descending sort by dateTaken
+        return b.dateTaken.localeCompare(a.dateTaken);
+    });
     return new Response(JSON.stringify(result), { status: 200 });
 };

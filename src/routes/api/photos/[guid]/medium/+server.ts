@@ -1,7 +1,7 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import fs from 'fs/promises';
 import path from 'path';
-import { config } from '../../../../../config';
+import { config } from '$config';
 
 export const GET: RequestHandler = async ({ params }) => {
     const guid = params.guid as string;

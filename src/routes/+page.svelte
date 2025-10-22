@@ -1,15 +1,17 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import { Api, type PhotoMetaClient } from "../api";
-    import { config } from "../config";
+    import { type PhotoMetaClient } from "$api";
 	import VirtualList from 'svelte-tiny-virtual-list';
-    import PhotoSlider from '../lib/components/PhotoSlider.svelte';
+	import ItemsUpdatedEvent from 'svelte-tiny-virtual-list';
+    import PhotoSlider from '$components/PhotoSlider.svelte';
+    import DatePicker from '$components/DatePicker.svelte';
+    import Options from "$components/Options.svelte";
 
     let virtualList;
     let photosMeta : Array<PhotoMetaClient> = [];
     let chunkedPhotos : Array<Array<PhotoMetaClient>> = [];
     let currentPhoto: PhotoMetaClient;
-    let currentDate: string = "";
+    let datepickerIndex: number = 0;
     let currentPhotoIndex: number = 0;
     let rowHeights: Array<number> = [];
     let chunkSize: number =  3;
@@ -18,6 +20,8 @@
     let chunkSizesSmall: Array<number> =  [3,5,7];
     let photoModalIsOpen: boolean = false;
     let windowHeight: number = 1000;
+    let scrollToIndex: number | null = null;
+    let closeAllModalsFromParent = false;
 
     const months = [ "January", "February", "March", "April", "May", "June", 
            "July", "August", "September", "October", "November", "December" ];
@@ -51,7 +55,6 @@
             photosMeta = data;
             if (photosMeta.length > 0) {
                 reChunk();
-                currentDate = getDateFormattedShort(photosMeta[0]);
             }
         });
 
@@ -104,33 +107,9 @@
         void el.offsetWidth; // forces reflow so the animation can restart
         el.classList.add('fadeout');
     }
-    
-    const handleScroll = (e: Event) => {
-        if (photosMeta.length <= 0 || !e || !e.detail) {
-            return;
-        }
-        // Get the scroll values and convert to percent
-        const detail = e.detail;
-        const totalHeight = detail.event.target.scrollHeight;
-        const percentScroll = detail.offset / totalHeight;
-        // Convert to index in photos array
-        const index = Math.max(0, Math.floor(percentScroll * photosMeta.length));
-        // Get dateTaken of index image
-        currentDate = getDateFormattedShort(photosMeta[index]);
-    };
-
-    const getDateFormattedShort = (photo: PhotoMetaClient) => {
-        if (photo == null || photo.dateTaken == null) {
-            return "";
-        }
-        // -1 because 0-index months array
-        const currentMonth = +photo.dateTaken.split('-')[1] - 1
-        const currentYear = +photo.dateTaken.split('-')[0]
-        return months[currentMonth] + ' ' + currentYear;
-    }
 
     const getNoPhotosFormatted = () => {
-        const noPhotos = photosMeta.length;
+        const noPhotos = photosMeta.length || 0;
         return noPhotos + ' photos';
     }
 
@@ -143,7 +122,7 @@
         return chunked;
     }
 
-    const reChunk = (increaseChunkSize: boolean = false) => {
+    const reChunk = (increaseChunkSize: boolean | null = null) => {
         // Check window width
         // Small screens should not have ability to have large chunk sizes
         const windowInnerWidth = window.innerWidth;
@@ -154,11 +133,13 @@
             currentChunkSizeArray = chunkSizesMedium;
         }
         
-        // Increase chunk size and chunk
-        if (increaseChunkSize) {
+        if (increaseChunkSize != null) {
             let index = currentChunkSizeArray.findIndex(x => x == chunkSize);
-            index += 1;
-            index %= currentChunkSizeArray.length;
+            if (increaseChunkSize && index < currentChunkSizeArray.length - 1) {
+                index += 1;
+            } else if (!increaseChunkSize && index > 0) {
+                index -= 1;
+            }
             chunkSize = currentChunkSizeArray[index];
             setCookie('chunkSize', chunkSize.toString());
         }
@@ -197,25 +178,52 @@
         photoModalIsOpen = true;
     }
 
-    const closeModal = () => {
+    const handleClosePhotoSlider = () => {
         photoModalIsOpen = false;
+    }
+
+    const handleCloseAllModals = () => {
+        closeAllModalsFromParent = true;
+        // Reset after 10ms
+        setTimeout(() => {
+            closeAllModalsFromParent = false;
+        }, 10);
+    }
+
+    const handleListItemUpdate = (e: ItemsUpdatedEvent) => {
+        const { start, end } = e.detail;
+        const middlePhotoRow = start + Math.floor((end - start) / 2);
+        const photoIndex = middlePhotoRow * chunkSize;
+        datepickerIndex = photoIndex;
     }
 </script>
 
 {#if photoModalIsOpen}
 <div id="photoModal">
-    <PhotoSlider photos={photosMeta} photoIndex={currentPhotoIndex} closeModal={closeModal}/>
+    <PhotoSlider photos={photosMeta} photoIndex={currentPhotoIndex} closeModal={handleClosePhotoSlider}/>
 </div>
 {/if}
-
-<div class="text-rounded-corners chunk-button">
-    <button id="chunkButton" on:click={() => reChunk(true)}>chunkSize {chunkSize}</button>
-</div>
-<div class="text-rounded-corners current-date">
-    {#if photosMeta.length > 0}
-    <h3>{currentDate}</h3>
-    {/if}
-</div>
+<Options
+    photos={photosMeta}
+    sortedPhotosCallback={(sortedPhotos) => {
+        photosMeta = sortedPhotos;
+        reChunk();
+    }}
+    zoomInCallback={() => {
+        reChunk(false);
+    }}
+    zoomOutCallback={() => {
+        reChunk(true);
+    }}
+    closeFromParent={closeAllModalsFromParent}
+/>
+<DatePicker 
+    photos={photosMeta} 
+    photoIndex={datepickerIndex} 
+    chunkSize={chunkSize}
+    on:setScroll={(e) => {scrollToIndex = Math.floor(e.detail / chunkSize)}}
+    closeFromParent={closeAllModalsFromParent}
+/>
 <div class="text-rounded-corners no-photos">
     {#if photosMeta.length > 0}
         <p>{getNoPhotosFormatted()}</p>
@@ -228,8 +236,12 @@
         height={windowHeight}
         itemCount={chunkedPhotos.length} 
         itemSize={rowHeights}
-        on:afterScroll={handleScroll}
-    >
+        scrollToAlignment='center'
+        scrollToBehaviour='instant'
+        on:itemsUpdated={handleListItemUpdate}
+        on:afterScroll={handleCloseAllModals}
+        {scrollToIndex}
+        >
 
     <div slot="item" let:index let:style {style}>
         <table style="width: 100%; table-layout: fixed;">
@@ -266,7 +278,8 @@
     }
 
     .text-rounded-corners {
-        background-color: rgba(255,255,255,0.7);
+        background-color: rgba(255,255,255,0.5);
+        color: black;
         width: fit-content;
         border-radius: 3px;
         padding: 0 3px 0 3px;
@@ -278,26 +291,11 @@
         max-width: 100%;
     }
 
-    .chunk-button {
-        position: fixed; 
-        z-index: 1; 
-        right: 10px; 
-        top: 40px;
-    }
-
     .no-photos {
         position: fixed; 
         z-index: 1; 
         right: 10px; 
         top: 10px; 
         height: 25px;
-    }
-
-    .current-date {
-        position: fixed; 
-        z-index: 1; 
-        left: 10px; 
-        top: 10px; 
-        height: 35px
     }
 </style>

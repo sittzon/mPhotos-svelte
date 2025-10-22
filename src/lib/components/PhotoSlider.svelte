@@ -85,11 +85,11 @@
       return "";
     }
     // error-no-date-found
-    if (photo.dateTaken.split('T')[1] == null) {
-      return photo.dateTaken.split('T')[0];
+    if (photo.dateTaken.split(' ')[1] == null) {
+      return photo.dateTaken.split(' ')[0];
     }
     
-    return photo.dateTaken.split('T')[0] + ' ' + photo.dateTaken.split('T')[1].split('.')[0];
+    return photo.dateTaken;
   }
   
   const next = () => {

@@ -40,26 +40,26 @@ self.addEventListener('fetch', event => {
         return cachedResponse || fetch(request).then(networkResponse => {
 
             // Check the Content-Length header to get the file size
-            // const contentLength = networkResponse.headers.get('Content-Length');
-            // const fileSize = contentLength ? parseInt(contentLength, 10) : 0;
+            const contentLength = networkResponse.headers.get('Content-Length');
+            const fileSize = contentLength ? parseInt(contentLength, 10) : 0;
 
-            // // Only cache the file if it's smaller than the MAX_FILE_SIZE
-            // if (fileSize && fileSize <= MAX_FILE_SIZE) {
-            //     return caches.open(CACHE_NAME).then(cache => {
-            //         cache.put(request, networkResponse.clone());
-            //         return networkResponse;
-            //     });
-            // } else {
-            //     // If file is too large or size is unknown, don't cache it
-            //     console.warn(`File too large to cache: ${request.url} (${fileSize} bytes)`);
-            //     return networkResponse;
-            // }
+            // Only cache the file if it's smaller than the MAX_FILE_SIZE
+            if (fileSize && fileSize <= MAX_FILE_SIZE) {
+                return caches.open(CACHE_NAME).then(cache => {
+                    cache.put(request, networkResponse.clone());
+                    return networkResponse;
+                });
+            } else {
+                // If file is too large or size is unknown, don't cache it
+                console.warn(`File too large to cache: ${request.url} (${fileSize} bytes)`);
+                return networkResponse;
+            }
 
-          return caches.open(CACHE_NAME).then(cache => {
-            // Cache the fetched image
-            cache.put(request, networkResponse.clone());
-            return networkResponse;
-          });
+          // return caches.open(CACHE_NAME).then(cache => {
+          //   // Cache the fetched image
+          //   cache.put(request, networkResponse.clone());
+          //   return networkResponse;
+          // });
         });
       })
     );

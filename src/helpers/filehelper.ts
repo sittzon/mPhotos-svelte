@@ -12,7 +12,7 @@ export function guidToLocation(guid: string): string | null {
     return photos.find(x => x.guid === guid)?.location ?? null;
 }
 
-// Recursively get all jpg/jpeg files in the directory
+// Recursively get all jpg/jpeg, heic/heif and png files in the directory
 export async function getFileInfosRecursively(root: string): Promise<Array<{ FullName: string; Name: string; Extension: string; Length: number }>> {
     const results: Array<{ FullName: string; Name: string; Extension: string; Length: number }> = [];
     console.log(`Scanning directory: ${root}`);
