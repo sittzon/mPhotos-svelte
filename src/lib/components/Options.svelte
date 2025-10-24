@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { type PhotoMetaClient } from '../../api';
+    import { type PhotoMetaClient } from "$api";
     import { fade, slide } from 'svelte/transition';
 
     export let photos: Array<PhotoMetaClient> = [];
@@ -31,8 +31,8 @@
 
     const sort = (latestFirst = true) => {
         const sortedPhotos = photos.slice().sort((a, b) => {
-            const dateA = new Date(a.dateTaken).getTime();
-            const dateB = new Date(b.dateTaken).getTime();
+            const dateA = new Date(a.dateTaken as string).getTime();
+            const dateB = new Date(b.dateTaken as string).getTime();
             return latestFirst ? dateB - dateA : dateA - dateB;
         });
         isSortedByLatest = latestFirst;

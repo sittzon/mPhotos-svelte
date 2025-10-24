@@ -1,19 +1,32 @@
-<script>
-  import { onMount } from "svelte";
+<script lang="ts">
+  import { onMount, onDestroy  } from "svelte";
+  import { type PhotoMetaClient } from "$api";
 
-  export let photos = [];
+  export let photos: Array<PhotoMetaClient> = [];
   export let closeModal = () => {}; // Feedback close to parent
-  export let photoIndex = 0; // Start index in photos array
+  export let photoIndex: number = 0; // Start index in photos array
+  export let nrToPreload: number = 1; // Number of photos to preload on each side
 
   let currentIndex = photoIndex;
-  $: prevIndex = wrap(currentIndex - 1);
-  $: nextIndex = wrap(currentIndex + 1);
-  $: currentPhoto = photos[currentIndex];
-  $: nextPhoto = photos[nextIndex];
-  $: prevPhoto = photos[prevIndex];
+  $: preloadIndexes = Array.from({ length: nrToPreload * 2 + 1 }, (_, i) => wrap(currentIndex - nrToPreload + i));
+  $: preloadPhotos = preloadIndexes.map(i => photos[i]);
+
+  // Reactive array of transform strings — recalculated when any dependency changes
+  $: transforms = preloadPhotos.map((photo, i) => {
+    const relIndex = i - nrToPreload; // 0 for current, negative = left, positive = right
+    const offset = relIndex * (viewportWidth + 10); // px offset from center
+
+    if (i === nrToPreload) {
+      // current slide uses scale / translateX / translateY / rotate and diffX/diffY
+      // ensure px units are present
+      return `scale(${scale}) translateX(${-diffX + translateX}px) translateY(${-diffY + translateY}px) rotate(${rotate}deg)`;
+    } else {
+      // other slides: keep them at scale 1 and only offset horizontally
+      return `scale(1) translateX(${-diffX + offset}px)`;
+    }
+  });
+
   $: viewportWidth = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-  // const nrToPreloadFull = 1; // Number of photos to preload full photo on each side of current
-  // const nrToPreloadThumb = 3; // Number of photos to preload thumb on each side of current
   let slideshowOpacity = 1; // Opacity of entire slideshow, used when dragging up/down to close
   const amountOfPixelsToClose = 100; // Pixels to drag before closing
   const amountOfPixelsForFadeout = 150; // Pixels to drag until opacity 100%
@@ -22,17 +35,14 @@
 
   onMount(() => {
     currentIndex = photoIndex;
-    // console.log("current is now:", current);
     document.addEventListener("keyup", keyPressUp);
+    window.addEventListener("resize", handleResize);
     
     // Show elements again immediately on user action
     ['click', 'touchstart', 'mousemove'].forEach(event => {
       document.addEventListener(event, () => {
-        if (scale > 1) {
-          return; // Don't fade out controls when zoomed in
-        }
-        const els = document.getElementsByClassName('fadeout');
-        const els5s = document.getElementsByClassName('fadeout5s');
+        const els = document.getElementsByClassName('fadeout') as HTMLCollectionOf<HTMLElement>;
+        const els5s = document.getElementsByClassName('fadeout5s') as HTMLCollectionOf<HTMLElement>;
         Array.from(els).forEach(el => {
           el.style.opacity = '1';  // instantly show
           resetFade(el);           // restart fade timer
@@ -45,24 +55,29 @@
     });
   });
 
+  onDestroy(() => {
+    window.removeEventListener("resize", handleResize);
+    document.removeEventListener("keyup", keyPressUp);
+  });
+
   // Helper to wrap index around
-  const wrap = (i) => (i + photos.length) % photos.length;
+  const wrap = (i: number) => (i + photos.length) % photos.length;
   
-  const resetFade = (el) => {
+  const resetFade = (el: HTMLElement) => {
     // Reset the animation by removing and re-adding the class
     el.classList.remove('fadeout');
     void el.offsetWidth; // forces reflow so the animation can restart
     el.classList.add('fadeout');
   }
   
-  const resetFade5s = (el) => {
+  const resetFade5s = (el: HTMLElement) => {
     // Reset the animation by removing and re-adding the class
     el.classList.remove('fadeout5s');
     void el.offsetWidth; // forces reflow so the animation can restart
     el.classList.add('fadeout5s');
   }
   
-  const keyPressUp = (key) => {
+  const keyPressUp = (key: KeyboardEvent) => {
     // console.log(key.code)
     if (key.code=='ArrowRight') {
       next();
@@ -80,7 +95,7 @@
     }
   }
   
-  const getDateFormattedLong = (photo) => {
+  const getDateFormattedLong = (photo: PhotoMetaClient) => {
     if (photo == null || photo.dateTaken == null) {
       return "";
     }
@@ -130,13 +145,13 @@
   let nextOnTouchEnd = false; // Whether to go to next photo on touch end
   let prevOnTouchEnd = false; // Whether to go to previous photo on touch end
 
-  const getDistance = (touches) => {
+  const getDistance = (touches: TouchList) => {
     const dx = touches[0].clientX - touches[1].clientX;
     const dy = touches[0].clientY - touches[1].clientY;
     return Math.hypot(dx, dy);
   }
 
-  const onTouchStart = (e) => {
+  const onTouchStart = (e: TouchEvent) => {
     animating = false;
 
     // Enable pinch to zoom on current photo
@@ -151,15 +166,13 @@
     }
   }
 
-  const onTouchMove = (e) => {
+  const onTouchMove = (e: TouchEvent) => {
     // Pinch-to-zoom on current photo
     if (e.touches.length === 2) {
       const distance = getDistance(e.touches);
       scale = Math.min(Math.max(lastScale * (distance / startDistance), 1), 4);
-      //console.log("Scale:", scale);
       // Replace current photo src with fullsize img
-      currentPhoto.src = photos[currentIndex].full?? photos[currentIndex].medium;
-      // console.log("Pinch zoom, scale:", scale);
+      // currentPhoto.src = photos[currentIndex].full?? photos[currentIndex].medium;
     }
     // One finger, drag to pan
     else if (e.touches.length === 1 && scale > 1.05)
@@ -168,18 +181,15 @@
       translateY = Math.min(Math.max(e.touches[0].clientY - startY, -200), 200);
       translateX /= 2; // Slow down panning
       translateY /= 2;
-      // console.log("Translate:", translateX, translateY);
     }
     // One finger, swipe to change photo or up/down to close
     else
     {
-      // scale = 1; // Reset scale if not pinching
       diffX = startX + lastTranslateX - e.touches[0].clientX;
       diffY = startY + lastTranslateY - e.touches[0].clientY;
 
       nextOnTouchEnd = false;
       prevOnTouchEnd = false;
-      // console.log("Diff:", diffX, diffY);
       if (changingSlide) {
         diffY = 0; // No vertical movement when changing slide
       }
@@ -189,11 +199,9 @@
       // Go to next/prev photo if beyond threshold
       if (!closingSlide && diffX > amountOfPixelsToSwitchPhoto) {
         changingSlide = true;
-        // diffY = 0; // No vertical movement when changing slide
         nextOnTouchEnd = true;
       } else if (!closingSlide && diffX < -amountOfPixelsToSwitchPhoto) {
         changingSlide = true;
-        // diffY = 0; // No vertical movement when changing slide
         prevOnTouchEnd = true;
       }
       // Drag vertically to close
@@ -249,7 +257,7 @@
       lastTranslateY = 0;
       diffX = viewportWidth+10; // To move nextPhoto to center. 
       // Switch to next photo after animation ends
-      setTimeout(() => { diffX = 0; animating = false; next();}, 400);
+      setTimeout(() => { diffX = 0; animating = false; next();}, 200);
     } else if (prevOnTouchEnd) {
       prevOnTouchEnd = false;
       scale = 1;
@@ -258,7 +266,7 @@
       lastTranslateY = 0;
       diffX = -viewportWidth-10; // To move prevPhoto to center. 
       // Switch to prev photo after animation ends
-      setTimeout(() => { diffX = 0; animating = false; prev();}, 400);
+      setTimeout(() => { diffX = 0; animating = false; prev();}, 200);
     }
   }
 
@@ -266,10 +274,13 @@
     currentIndex = 0;
     startX = 0;
     startY = 0;
-    // loaded = {};
     scale = 1;
     startDistance = 0;
   }
+
+  const handleResize = () => {
+    viewportWidth = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+  };
 </script>
 
 <div id="slider" on:touchstart={onTouchStart} on:touchmove={onTouchMove} on:touchend={onTouchEnd}>
@@ -281,24 +292,14 @@
       <p>{getDateFormattedLong(photos[currentIndex])}</p>
   </div>
     <div class="slideshow" style="opacity:{slideshowOpacity};">
-      <img 
-        src={prevPhoto.medium}
-        class='slide previous {animating ? 'animating' : ''}'
-        style="transform: scale(1) translateX({-diffX-viewportWidth-10}px);"
-        alt={prevPhoto.dateTaken}
-        /> 
-        <img 
-        src={currentPhoto.medium}
-        class='slide current {animating ? 'animating' : ''}'
-        style="transform: scale({scale}) translateX({-diffX+translateX}px) translateY({-diffY+translateY}px) rotate({rotate}deg);"
-        alt={currentPhoto.dateTaken}
-        /> 
-        <img 
-        src={nextPhoto.medium}
-        class='slide next {animating ? 'animating' : ''}'
-        style="transform: scale(1) translateX({-diffX+viewportWidth+10}px);"
-        alt={nextPhoto.dateTaken}
-      /> 
+      {#each preloadPhotos as photo, i}
+        <img
+          src={photo.medium}
+          class="slide {i === nrToPreload ? 'current' : i < nrToPreload ? 'previous' : 'next'} {animating ? 'animating' : ''}"
+          alt={photo.dateTaken}
+          style="transform: {transforms[i]};"
+        />
+      {/each}
     </div>
 </div>
 
@@ -332,7 +333,7 @@
   }
 
   .current {
-    z-index: 11;
+    z-index: 12;
   }
 
   .previous,
@@ -341,7 +342,7 @@
   }
 
   .animating {
-    transition: transform 0.4s cubic-bezier(0.22, 0.61, 0.36, 1);
+    transition: transform 0.2s cubic-bezier(0.22, 0.61, 0.36, 1);
   }
 
   .arrow {

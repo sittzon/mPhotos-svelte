@@ -7,7 +7,7 @@
     import DatePicker from '$components/DatePicker.svelte';
     import Options from "$components/Options.svelte";
 
-    let virtualList;
+    let virtualList: VirtualList;
     let photosMeta : Array<PhotoMetaClient> = [];
     let chunkedPhotos : Array<Array<PhotoMetaClient>> = [];
     let currentPhoto: PhotoMetaClient;
@@ -22,6 +22,7 @@
     let windowHeight: number = 1000;
     let scrollToIndex: number | null = null;
     let closeAllModalsFromParent = false;
+    let isFingerDown: boolean = false;
 
     const months = [ "January", "February", "March", "April", "May", "June", 
            "July", "August", "September", "October", "November", "December" ];
@@ -60,6 +61,9 @@
 
         // Add event listeners
         window.addEventListener("resize", calcRowHeights);
+        window.addEventListener("touchstart", handleTouchStart);
+        window.addEventListener("touchend", handleTouchEnd);
+        window.addEventListener("touchcancel", handleTouchEnd);
 
         // Show elements again immediately on user action
         ['click', 'touchstart', 'mousemove'].forEach(event => {
@@ -83,7 +87,7 @@
         //     });
         // }
 
-        // Add {full, thumb} information for PhotoSlider to use
+        // Add {thumb, medium, full} information for PhotoSlider to use
         photosMeta.forEach(photo => {
             photo.thumb = "api/photos/" + photo.guid + "/thumb";
             photo.medium = "api/photos/" + photo.guid + "/medium";
@@ -178,16 +182,28 @@
         photoModalIsOpen = true;
     }
 
+    const handleTouchStart = () => {
+        isFingerDown = true;
+    }
+
+    const handleTouchEnd = () => {
+        isFingerDown = false;
+    }
+
     const handleClosePhotoSlider = () => {
         photoModalIsOpen = false;
     }
 
     const handleCloseAllModals = () => {
-        closeAllModalsFromParent = true;
-        // Reset after 10ms
-        setTimeout(() => {
+        if (isFingerDown && closeAllModalsFromParent == false) {
+            closeAllModalsFromParent = true;
+            // Reset after 10ms
+            setTimeout(() => {
+                closeAllModalsFromParent = false;
+            }, 10);
+        } else {
             closeAllModalsFromParent = false;
-        }, 10);
+        }
     }
 
     const handleListItemUpdate = (e: ItemsUpdatedEvent) => {
@@ -200,7 +216,7 @@
 
 {#if photoModalIsOpen}
 <div id="photoModal">
-    <PhotoSlider photos={photosMeta} photoIndex={currentPhotoIndex} closeModal={handleClosePhotoSlider}/>
+    <PhotoSlider photos={photosMeta} photoIndex={currentPhotoIndex} closeModal={handleClosePhotoSlider} nrToPreload={2}/>
 </div>
 {/if}
 <Options

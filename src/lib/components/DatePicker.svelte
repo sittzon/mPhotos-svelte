@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { type PhotoMetaClient } from '../../api';
+    import { type PhotoMetaClient } from "$api";
     import { fade, slide } from 'svelte/transition';
     import { createEventDispatcher } from 'svelte';
 
@@ -67,8 +67,8 @@
                 }
             }
 
-            const currentMonth = +photo.dateTaken.split('-')[1] - 1;
-            const currentYear = +photo.dateTaken.split('-')[0];
+            const currentMonth = +(photo.dateTaken as string).split('-')[1] - 1;
+            const currentYear = +(photo.dateTaken as string).split('-')[0];
             const dateAsString = months[currentMonth] + ' ' + currentYear;
             if (!addedIndexes.has(dateAsString)) {
                 addedIndexes.add(dateAsString);

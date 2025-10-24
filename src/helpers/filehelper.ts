@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs/promises';
-import type { PhotoMeta } from './interfaces';
-import { memoryCache } from './memorycache';
+import type { PhotoMeta } from '$helpers/interfaces';
+import { memoryCache } from '$helpers/memorycache';
 
 export const photosMetaCacheKey = 'photosMeta';
 
