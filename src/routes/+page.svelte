@@ -23,6 +23,7 @@
     let scrollToIndex: number | null = null;
     let closeAllModalsFromParent = false;
     let isFingerDown: boolean = false;
+    let maxChunkSize: number = 7;
 
     const months = [ "January", "February", "March", "April", "May", "June", 
            "July", "August", "September", "October", "November", "December" ];
@@ -53,7 +54,8 @@
             }
         })
         .then((data) => {
-            photosMeta = data;
+            // Filter out photos with lengthSeconds <= 3 (assumed to be live-photos)
+            photosMeta = data.filter((photo) => photo.type === 'photo' || photo.lengthSeconds > 4);
             if (photosMeta.length > 0) {
                 reChunk();
             }
@@ -92,6 +94,7 @@
             photo.thumb = "api/photos/" + photo.guid + "/thumb";
             photo.medium = "api/photos/" + photo.guid + "/medium";
             photo.full = "api/photos/" + photo.guid;
+            photo.video = "api/video/" + photo.guid;
         });
     });
 
@@ -136,9 +139,15 @@
         } else if (windowInnerWidth > 800) {
             currentChunkSizeArray = chunkSizesMedium;
         }
+        maxChunkSize = currentChunkSizeArray[currentChunkSizeArray.length-1];
         
         if (increaseChunkSize != null) {
             let index = currentChunkSizeArray.findIndex(x => x == chunkSize);
+            // If index not found, reset to first element in currentChunkSizeArray
+            if (index == null)
+            {
+                index = 0;
+            }
             if (increaseChunkSize && index < currentChunkSizeArray.length - 1) {
                 index += 1;
             } else if (!increaseChunkSize && index > 0) {
@@ -212,15 +221,22 @@
         const photoIndex = middlePhotoRow * chunkSize;
         datepickerIndex = photoIndex;
     }
+    
+    // Format seconds as mm:ss
+    function formatDuration(seconds: number): string {
+        const m = Math.floor(seconds / 60);
+        const s = Math.floor(seconds % 60);
+        return `${m}:${s.toString().padStart(2, '0')}`;
+    }
 </script>
 
 {#if photoModalIsOpen}
-<div id="photoModal">
     <PhotoSlider photos={photosMeta} photoIndex={currentPhotoIndex} closeModal={handleClosePhotoSlider} nrToPreload={2}/>
-</div>
 {/if}
 <Options
     photos={photosMeta}
+    currentChunkSize={chunkSize}
+    maxChunkSize={maxChunkSize}
     sortedPhotosCallback={(sortedPhotos) => {
         photosMeta = sortedPhotos;
         reChunk();
@@ -265,12 +281,21 @@
             {#each chunkedPhotos[index] as currentPhotoMeta, itemIndex}
                 <td style="">
                     <a on:click={() => openModal(currentPhotoMeta, index*chunkSize + itemIndex)} href='/'>
-                        <img 
-                        id={currentPhotoMeta.guid}
-                        src="api/photos/{currentPhotoMeta.guid}/thumb"
-                        alt={currentPhotoMeta.dateTaken}
-                        style="max-height: {rowHeights[index]-2}px;"
-                        >
+                        <div style="position: relative; display: inline-block;">
+                            <img 
+                                id={currentPhotoMeta.guid}
+                                src="api/photos/{currentPhotoMeta.guid}/thumb"
+                                alt={currentPhotoMeta.dateTaken}
+                                style="max-height: {rowHeights[index]-2}px;"
+                            >
+                            {#if currentPhotoMeta.type === 'video' || currentPhotoMeta.type === 'live-photo-video'}
+                                {#if currentPhotoMeta.lengthSeconds}
+                                    <span class="video-duration-overlay">
+                                        {formatDuration(currentPhotoMeta.lengthSeconds)}
+                                    </span>
+                                {/if}
+                            {/if}
+                        </div>
                     </a>
                 </td>
             {/each}
@@ -297,8 +322,21 @@
         background-color: rgba(255,255,255,0.5);
         color: black;
         width: fit-content;
-        border-radius: 3px;
+        border-radius: 8px;
         padding: 0 3px 0 3px;
+    }
+    
+    .video-duration-overlay {
+        position: absolute;
+        right: 2px;
+        bottom: 2px;
+        background: rgba(0,0,0,0.3);
+        color: #fff;
+        font-size: 0.7em;
+        padding: 2px 2px;
+        border-radius: 4px;
+        z-index: 3;
+        pointer-events: none;
     }
 
     td a img {
@@ -313,5 +351,6 @@
         right: 10px; 
         top: 10px; 
         height: 25px;
+        border: 1px solid black;
     }
 </style>

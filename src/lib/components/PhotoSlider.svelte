@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy  } from "svelte";
   import { type PhotoMetaClient } from "$api";
+  import ThumbnailStrip from '$components/ThumbnailStrip.svelte';
 
   export let photos: Array<PhotoMetaClient> = [];
   export let closeModal = () => {}; // Feedback close to parent
@@ -26,7 +27,10 @@
     }
   });
 
+  let isVideoPlaying: boolean = false;
+
   $: viewportWidth = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+  let isInformationShown: boolean = false;
   let slideshowOpacity = 1; // Opacity of entire slideshow, used when dragging up/down to close
   const amountOfPixelsToClose = 100; // Pixels to drag before closing
   const amountOfPixelsForFadeout = 150; // Pixels to drag until opacity 100%
@@ -79,6 +83,13 @@
   
   const keyPressUp = (key: KeyboardEvent) => {
     // console.log(key.code)
+    // Reset fade for fadeout5s
+    const els5s = document.getElementsByClassName('fadeout5s') as HTMLCollectionOf<HTMLElement>;
+    Array.from(els5s).forEach(el => {
+      el.style.opacity = '1';  // instantly show
+      resetFade5s(el);         // restart fade timer
+    });
+    
     if (key.code=='ArrowRight') {
       next();
     }
@@ -92,6 +103,9 @@
     if (key.code=='Space') {
       resetSlider();
       closeModal();
+    }
+    if (key.code=='KeyI') {
+      isInformationShown = !isInformationShown;
     }
   }
   
@@ -283,36 +297,83 @@
   };
 </script>
 
-<div id="slider" on:touchstart={onTouchStart} on:touchmove={onTouchMove} on:touchend={onTouchEnd}>
-  <div class="arrow left fadeout" on:click={prev}>‹</div>
-  <div class="arrow right fadeout" on:click={next}>›</div>
-  <div class="close-button fadeout" on:click={() => { resetSlider(); closeModal(); }}>✖</div>
+<div id="slider" on:touchstart={onTouchStart} on:touchmove={onTouchMove} on:touchend={onTouchEnd} role="navigation">
+  {#if scale <= 1}
+    <button class="arrow left fadeout" on:click={prev} >‹</button>
+    <button class="arrow right fadeout" on:click={next} >›</button>
+    <button class="close-button fadeout" on:click={() => { resetSlider(); closeModal(); }}>✖</button>
 
-  <div class="text-rounded-corners date fadeout5s">
+    <div class="text-rounded-corners date fadeout5s">
       <p>{getDateFormattedLong(photos[currentIndex])}</p>
-  </div>
+    </div>
+  {/if}
     <div class="slideshow" style="opacity:{slideshowOpacity};">
       {#each preloadPhotos as photo, i}
-        <img
+        <!-- {#if photo.type === 'video' && i === nrToPreload} -->
+        {#if isVideoPlaying && photo.type === 'video' && i === nrToPreload}
+          <video width="100%" height="100%" controls autoplay>
+            <source 
+              src={photo.video}
+              type="video/mp4"
+              />
+            <track kind="captions" src="" srclang="en" label="English captions" default>
+          </video>
+        {:else}
+          <img
           src={photo.medium}
-          class="slide {i === nrToPreload ? 'current' : i < nrToPreload ? 'previous' : 'next'} {animating ? 'animating' : ''}"
+          class="slide 
+            {i === nrToPreload ? 'current' : i < nrToPreload ? 'previous' : 'next'} 
+            {animating ? 'animating' : ''}
+            "
           alt={photo.dateTaken}
           style="transform: {transforms[i]};"
-        />
+          />
+          {#if photo.type === 'video' && !isVideoPlaying}
+            <button class="play-icon" 
+              on:click={() => {isVideoPlaying = !isVideoPlaying; console.log("isVideoPlaying: ", isVideoPlaying)}}
+              >
+              <!-- style="transform: {transforms[i]}" -->
+            </button>
+          {/if}
+        {/if}
       {/each}
     </div>
+  {#if isInformationShown}
+    <div class="text-rounded-corners" style="position: absolute; bottom: 10px; left: 50%; right: 50%; width: 300px; transform: translateX(-50%); z-index: 20; ">
+      <p>{photos[currentIndex].name}</p>
+      <p>{photos[currentIndex].width}x{photos[currentIndex].height}</p>
+      <p>{photos[currentIndex].sizeKb} Kb</p>
+    </div>
+  {/if}
+  {#if scale <= 1}
+    <ThumbnailStrip
+      photos={photos}
+      currentIndex={currentIndex}
+      visibleRange={4}
+      on:select={(e) => currentIndex = e.detail.index}
+    />
+  {/if}
 </div>
+
 
 <style>
   #slider {
     overflow: hidden;
     width: 100%;
+    /* height: 120dvh; */
     /* Prevent scrolling in either direction */
     touch-action: pan-y;
     touch-action: pan-x;
     overflow-x: hidden;
     overflow-y: hidden;
     z-index: 10;
+  }
+
+  button {
+      color: black;
+      background: none;
+      border: none;
+      padding: 0;
   }
 
   .slideshow {
@@ -326,7 +387,8 @@
 
   .slide {
     position: absolute;
-    top: 0; left: 0;
+    top: 0; 
+    left: 0;
     width: 100%;
     height: 100%;
     object-fit: contain;
@@ -421,4 +483,18 @@
       left: 50%;
       transform: translate(-50%, 0);
   }
+
+  .play-icon::before {
+      content: '';
+      position: absolute;
+      width: 64px;
+      height: 64px;
+      left: 50%;
+      top: 50%;
+      transform: translateX(-50%) translateY(-50%);
+      background: url('play-icon.svg') no-repeat center;
+      background-size: contain;
+      z-index: 15;
+  }
+
 </style>

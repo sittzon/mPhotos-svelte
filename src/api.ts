@@ -29,9 +29,12 @@ export interface PhotoMetaClient {
   /** @format date-time */
   dateTaken?: string | null;
   name?: string | null;
+  type?: 'photo' | 'video' | 'live-photo-video' | null;
   thumb?: string | null;
   medium?: string | null;
   full?: string | null;
+  video?: string | null;
+  lengthSeconds?: number | null;
 }
 
 export type QueryParamsType = Record<string | number, any>;

@@ -80,17 +80,19 @@
 
 </script>
 
-<div id="datepicker" class="text-rounded-corners current-date {isDatePickerOpen ? 'full-height' : '' }">
+<button id="datepicker" class="text-rounded-corners current-date {isDatePickerOpen ? 'full-height' : '' }">
     {#if !isDatePickerOpen}
     <h3 transition:slide>{getDateFormattedShort(photos[photoIndex])}</h3>
     {:else}
     <ul transition:slide>
         {#each getAllDatesFormattedShort() as {index, dateAsString}}
-        <li transition:fade on:click={() => dispatch("setScroll", index)}>{dateAsString}</li>
+        <li>
+            <button on:click={() => dispatch("setScroll", index)}>{dateAsString}</button>
+        </li>
         {/each}
     </ul>
     {/if}
-</div>
+</button>
 
 <style>
     #datepicker {
@@ -98,6 +100,16 @@
         text-align: right;
         font-size: 20px;
         font-weight: 500;
+        border: 1px solid black;
+        text-align: center;
+        color: black;
+    }
+
+    button {
+        color: black;
+        background: none;
+        border: none;
+        padding: 0;
     }
     
     .full-height {
@@ -113,7 +125,7 @@
     .text-rounded-corners {
         background-color: rgba(255,255,255,0.7);
         width: fit-content;
-        border-radius: 3px;
+        border-radius: 8px;
         padding: 0 3px 0 3px;
     }
 

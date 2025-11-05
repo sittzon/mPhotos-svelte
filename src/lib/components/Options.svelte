@@ -4,6 +4,8 @@
     import { fade, slide } from 'svelte/transition';
 
     export let photos: Array<PhotoMetaClient> = [];
+    export let currentChunkSize: number = 3;
+    export let maxChunkSize: number = 7;
     export let sortedPhotosCallback: (photos: PhotoMetaClient[]) => void = () => {};
     export let zoomInCallback: () => void = () => {};
     export let zoomOutCallback: () => void = () => {};
@@ -15,6 +17,7 @@
 
     let isModalOpen: boolean = false;
     let isSortedByLatest: boolean = true;
+    $: isMaxChunkSize = maxChunkSize == currentChunkSize;
 
     onMount(() => {
         document.addEventListener('click', handleToggleOpen);
@@ -50,8 +53,10 @@
     let options = [
         {id: 0, displayName: 'Newest first', func: () => {sort(true)}, icon: 'sort-latest', disabled: isSortedByLatest},
         {id: 1, displayName: 'Oldest first', func: () => {sort(false)}, icon: 'sort-earliest', disabled: !isSortedByLatest},
-        {id: 2, displayName: 'Zoom in', func: () => {zoomInCallback()}, icon: 'zoom-in', disabled: false},
-        {id: 3, displayName: 'Zoom out', func: () => {zoomOutCallback()}, icon: 'zoom-out', disabled: false},
+        // {id: 2, displayName: 'Zoom in', func: () => {zoomInCallback()}, icon: 'zoom-in', disabled: currentChunkSize == 3},
+        // {id: 3, displayName: 'Zoom out', func: () => {zoomOutCallback()}, icon: 'zoom-out', disabled: isMaxChunkSize},
+        {id: 2, displayName: 'Zoom in', func: () => {zoomInCallback()}, icon: 'zoom-in'},
+        {id: 3, displayName: 'Zoom out', func: () => {zoomOutCallback()}, icon: 'zoom-out'},
     ]
 
 </script>
@@ -85,6 +90,7 @@
         position: fixed;
         padding: 3px 3px 3px 3px;
         align-items: center;
+        border: 1px solid black;
     }
 
     .hamburger-icon {
@@ -119,7 +125,6 @@
     .disabled {
         pointer-events: none;
         opacity: 0.5;
-        text-decoration: line-through;
     }
     
     .text-rounded-corners {
