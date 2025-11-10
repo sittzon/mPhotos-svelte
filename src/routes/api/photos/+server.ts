@@ -9,6 +9,8 @@ import { memoryCache } from '$helpers/memorycache';
 
 const metaDataFilename = path.join(config.GENERATED_THUMBNAILS, config.METADATA_FILE || 'metadata.json');
 const errorLogFilename = path.join(config.GENERATED_THUMBNAILS, config.ERRORS_FILE || 'errors.log');
+const originalsDir = config.ORIGINAL_PHOTOS || '/originals';
+const thumbsDir = config.GENERATED_THUMBNAILS || '/thumbs';
 const thumbnailSizeWidth = config.THUMBNAIL_SIZE || 300;
 const mediumSizeWidth = config.MEDIUM_SIZE || 1200;
 const videoExts = ['.mp4', '.mov'];
@@ -17,8 +19,23 @@ const imageExts = ['.jpg', '.jpeg', '.heic', '.heif', '.png'];
 // Load photos
 async function loadPhotos() {
     if (!memoryCache[photosMetaCacheKey]) {
+        // Check if originalsDir directory exists
+        try {
+            await fs.stat(originalsDir);
+        } catch {
+            console.error('Original photos directory does not exist');
+            return;
+        }
+
+        // Create thumbs dir if not exists
+        try {
+            await fs.stat(thumbsDir);
+        } catch {
+            await fs.mkdir(thumbsDir, { recursive: true });
+        }
+
         // First, get all original photo and video files
-        let originalPhotos = await getFileInfosRecursively(config.ORIGINAL_PHOTOS);
+        let originalPhotos = await getFileInfosRecursively(originalsDir);
         originalPhotos = originalPhotos.filter(x => 
             imageExts.includes(x.Extension.toLowerCase())
             || videoExts.includes(x.Extension.toLowerCase())
@@ -55,10 +72,11 @@ async function loadPhotos() {
                 let isVideo = videoExts.includes(fileInfo.Extension.toLowerCase());
                 if (isVideo) {
                     [width, height] = await getVideoDimensions(fileInfo.FullName);
+                    dateTaken = await getDateTakenFromPath(fileInfo.FullName) as string;
 
-                    // If video is less than 3 seconds, treat as live photo video
+                    // If video is less than 4 seconds, treat as live photo sidecar video
                     lengthSeconds = await getVideoDuration(fileInfo.FullName);
-                    if (lengthSeconds < 3) {
+                    if (lengthSeconds < 4) {
                         type = 'live-photo-video';
                     } else {
                         type = 'video';
@@ -85,9 +103,9 @@ async function loadPhotos() {
 
                 // Only generate thumbnail if not found on disk
                 const isHeic = fileInfo.Extension.toLowerCase() === '.heic' || fileInfo.Extension.toLowerCase() === '.heif';
-                const thumbPath = path.join(config.GENERATED_THUMBNAILS, photoMeta.guid + '.webp');
-                const thumbExists = await fs.stat(thumbPath).then(() => true).catch(() => false);
-                if (!thumbExists) {
+                const thumbPath = path.join(thumbsDir, photoMeta.guid + '.webp');
+                const thumbFileExists = await fs.stat(thumbPath).then(() => true).catch(() => false);
+                if (!thumbFileExists) {
                     const aspectRatio = photoMeta.width / photoMeta.height;
                     const w = thumbnailSizeWidth;
                     const h = Math.floor(photoMeta.height * (w / photoMeta.width));
@@ -99,13 +117,15 @@ async function loadPhotos() {
                 }
                 
                 // Do same for medium size
-                const mediumPath = path.join(config.GENERATED_THUMBNAILS, photoMeta.guid + '-medium.webp');
-                const mediumExists = await fs.stat(mediumPath).then(() => true).catch(() => false);
-                if (!mediumExists) {
+                const mediumPath = path.join(thumbsDir, photoMeta.guid + '-medium.webp');
+                const mediumFileExists = await fs.stat(mediumPath).then(() => true).catch(() => false);
+                const mediumSizeWidthMin = Math.min(photoMeta.width, mediumSizeWidth); // Don't upscale beyond original width
+                const mediumSizeHeight = Math.floor(photoMeta.height * (mediumSizeWidthMin / photoMeta.width));
+                if (!mediumFileExists) {
                     if (isVideo) {
-                        await generateVideoThumbnail(fileInfo.FullName, mediumPath, mediumSizeWidth, Math.floor(photoMeta.height * (mediumSizeWidth / photoMeta.width)), 1);
+                        await generateVideoThumbnail(fileInfo.FullName, mediumPath, mediumSizeWidthMin, mediumSizeHeight, 1);
                     } else {
-                        await generateThumbnailBytes(bytes, mediumSizeWidth, Math.floor(photoMeta.height * (mediumSizeWidth / photoMeta.width)), mediumPath, 99, isHeic);
+                        await generateThumbnailBytes(bytes, mediumSizeWidthMin, mediumSizeHeight, mediumPath, 99, isHeic);
                     }
                 }
                 

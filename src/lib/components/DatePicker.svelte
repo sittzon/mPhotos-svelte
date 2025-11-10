@@ -82,15 +82,18 @@
 
 <button id="datepicker" class="text-rounded-corners current-date {isDatePickerOpen ? 'full-height' : '' }">
     {#if !isDatePickerOpen}
-    <h3 transition:slide>{getDateFormattedShort(photos[photoIndex])}</h3>
+        <div>{getDateFormattedShort(photos[photoIndex])}</div>
     {:else}
-    <ul transition:slide>
-        {#each getAllDatesFormattedShort() as {index, dateAsString}}
-        <li>
-            <button on:click={() => dispatch("setScroll", index)}>{dateAsString}</button>
-        </li>
-        {/each}
-    </ul>
+        <ul id="datelist" transition:slide={{duration: 200}}>
+            {#each getAllDatesFormattedShort() as {index, dateAsString}}
+            <li>
+                <button class={dateAsString == getDateFormattedShort(photos[photoIndex]) ? "selected-date" : ""}
+                        on:click={() => dispatch("setScroll", index)}>
+                    {dateAsString}
+                </button>
+            </li>
+            {/each}
+        </ul>
     {/if}
 </button>
 
@@ -98,13 +101,16 @@
     #datepicker {
         cursor: pointer;
         text-align: right;
-        font-size: 20px;
-        font-weight: 500;
-        border: 1px solid black;
+        font-size: 20px; 
+        left: 10px; 
+        top: 10px;
         text-align: center;
         color: black;
+        align-items: center;
+        box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.9);
+        z-index: 1;
     }
-
+    
     button {
         color: black;
         background: none;
@@ -113,26 +119,31 @@
     }
     
     .full-height {
-        height: 40%;
+        height: 50%;
     }
-
-    #datepicker ul {
-        padding: 0 3px 0 3px;
+    
+    .selected-date {
+        font-weight: bold;
+    }
+    
+    ul {
+        border: 1px solid black;
+        border-radius: 12px;
+        background-color: rgba(255,255,255,0.8);
+        padding: 0px 3px 0px 0px;
         max-height: 100%; 
         overflow-y: auto;
+        text-align: right;
     }
 
     .text-rounded-corners {
         background-color: rgba(255,255,255,0.7);
-        width: fit-content;
-        border-radius: 8px;
-        padding: 0 3px 0 3px;
+        border-radius: 12px;
+        padding: 0 0px 0 0px;
     }
 
     .current-date {
-        position: fixed; 
-        z-index: 1; 
-        left: 10px; 
-        top: 10px;
+        position: fixed;
+        width: 160px;
     }
 </style>

@@ -122,6 +122,7 @@
   }
   
   const next = () => {
+    isVideoPlaying = false;
     scale = 1; // Reset scale on photo change
     translateX = 0;
     translateY = 0;
@@ -131,6 +132,7 @@
   }
   
   const prev = () => {
+    isVideoPlaying = false;
     scale = 1; // Reset scale on photo change
     translateX = 0;
     translateY = 0;
@@ -181,6 +183,9 @@
   }
 
   const onTouchMove = (e: TouchEvent) => {
+    // Disable video playing on touch move
+    isVideoPlaying = false;
+
     // Pinch-to-zoom on current photo
     if (e.touches.length === 2) {
       const distance = getDistance(e.touches);
@@ -309,7 +314,6 @@
   {/if}
     <div class="slideshow" style="opacity:{slideshowOpacity};">
       {#each preloadPhotos as photo, i}
-        <!-- {#if photo.type === 'video' && i === nrToPreload} -->
         {#if isVideoPlaying && photo.type === 'video' && i === nrToPreload}
           <video width="100%" height="100%" controls autoplay>
             <source 
@@ -329,10 +333,10 @@
           style="transform: {transforms[i]};"
           />
           {#if photo.type === 'video' && !isVideoPlaying}
-            <button class="play-icon" 
-              on:click={() => {isVideoPlaying = !isVideoPlaying; console.log("isVideoPlaying: ", isVideoPlaying)}}
+            <button class="play-icon {animating ? 'animating' : ''}" 
+              on:click={() => isVideoPlaying = true}
+              style="transform: {transforms[i]}"
               >
-              <!-- style="transform: {transforms[i]}" -->
             </button>
           {/if}
         {/if}
@@ -360,8 +364,6 @@
   #slider {
     overflow: hidden;
     width: 100%;
-    /* height: 120dvh; */
-    /* Prevent scrolling in either direction */
     touch-action: pan-y;
     touch-action: pan-x;
     overflow-x: hidden;
@@ -484,14 +486,14 @@
       transform: translate(-50%, 0);
   }
 
-  .play-icon::before {
+  .play-icon {
       content: '';
       position: absolute;
       width: 64px;
       height: 64px;
-      left: 50%;
-      top: 50%;
-      transform: translateX(-50%) translateY(-50%);
+      left: 45%;
+      right: 45%;
+      top: 45%;
       background: url('play-icon.svg') no-repeat center;
       background-size: contain;
       z-index: 15;

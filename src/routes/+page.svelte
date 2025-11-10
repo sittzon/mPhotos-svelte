@@ -6,9 +6,11 @@
     import PhotoSlider from '$components/PhotoSlider.svelte';
     import DatePicker from '$components/DatePicker.svelte';
     import Options from "$components/Options.svelte";
+    import type { PhotoMeta } from "$helpers/interfaces";
 
     let virtualList: VirtualList;
-    let photosMeta : Array<PhotoMetaClient> = [];
+    let originalPhotosMetadata : Array<PhotoMetaClient> = [];
+    let filteredPhotosMetadata : Array<PhotoMetaClient> = [];
     let chunkedPhotos : Array<Array<PhotoMetaClient>> = [];
     let currentPhoto: PhotoMetaClient;
     let datepickerIndex: number = 0;
@@ -24,9 +26,13 @@
     let closeAllModalsFromParent = false;
     let isFingerDown: boolean = false;
     let maxChunkSize: number = 7;
+    let toggleShowOnlyVideos: boolean = false;
+    let showSquareThumbs: boolean = false; // false = original aspect ratio, true = square
 
     const months = [ "January", "February", "March", "April", "May", "June", 
            "July", "August", "September", "October", "November", "December" ];
+
+    $: currentNoPhotos = filteredPhotosMetadata.length || 0;
 
     onMount(async () =>
     {
@@ -54,15 +60,28 @@
             }
         })
         .then((data) => {
-            // Filter out photos with lengthSeconds <= 3 (assumed to be live-photos)
-            photosMeta = data.filter((photo) => photo.type === 'photo' || photo.lengthSeconds > 4);
-            if (photosMeta.length > 0) {
+            originalPhotosMetadata = data;
+            
+            // Add {thumb, medium, full} information for PhotoSlider to use
+            // This information is not present during transfer to minimize data size
+            originalPhotosMetadata.forEach(photo => {
+                photo.thumb = "api/photos/" + photo.guid + "/thumb";
+                photo.medium = "api/photos/" + photo.guid + "/medium";
+                photo.full = "api/photos/" + photo.guid;
+                photo.video = "api/video/" + photo.guid;
+            });
+            
+            // Originally filter out live-photo-videos 
+            filteredPhotosMetadata = originalPhotosMetadata
+                .filter((photo: PhotoMetaClient) => photo.type != 'live-photo-video');
+            if (filteredPhotosMetadata.length > 0) {
                 reChunk();
             }
         });
 
         // Add event listeners
-        window.addEventListener("resize", calcRowHeights);
+        window.addEventListener("orientationchange", () => calcRowHeights(showSquareThumbs));
+        window.addEventListener("resize", () => calcRowHeights(showSquareThumbs));
         window.addEventListener("touchstart", handleTouchStart);
         window.addEventListener("touchend", handleTouchEnd);
         window.addEventListener("touchcancel", handleTouchEnd);
@@ -88,14 +107,6 @@
         //         console.log('Service Worker registration failed:', err);
         //     });
         // }
-
-        // Add {thumb, medium, full} information for PhotoSlider to use
-        photosMeta.forEach(photo => {
-            photo.thumb = "api/photos/" + photo.guid + "/thumb";
-            photo.medium = "api/photos/" + photo.guid + "/medium";
-            photo.full = "api/photos/" + photo.guid;
-            photo.video = "api/video/" + photo.guid;
-        });
     });
 
     const getCookie = (name: string) => {
@@ -113,11 +124,6 @@
         el.classList.remove('fadeout');
         void el.offsetWidth; // forces reflow so the animation can restart
         el.classList.add('fadeout');
-    }
-
-    const getNoPhotosFormatted = () => {
-        const noPhotos = photosMeta.length || 0;
-        return noPhotos + ' photos';
     }
 
     // Split array into groups of 'n'
@@ -156,15 +162,24 @@
             chunkSize = currentChunkSizeArray[index];
             setCookie('chunkSize', chunkSize.toString());
         }
-        chunkedPhotos = chunkPhotos(photosMeta, chunkSize);
+        chunkedPhotos = chunkPhotos(filteredPhotosMetadata, chunkSize);
 
-        calcRowHeights();
+        calcRowHeights(showSquareThumbs);
     }
 
-    const calcRowHeights = () => {
+    const calcRowHeights = (useSquareThumbs: boolean = false) => {
         rowHeights = [];
         const windowInnerWidth = window.innerWidth;
         const maxImgWidth = windowInnerWidth / chunkSize;
+
+        if (useSquareThumbs) {
+            for (let i = 0; i < chunkedPhotos.length; ++i) {
+                rowHeights.push(maxImgWidth); // fixed size for square thumbs
+            }
+            virtualList.recomputeSizes(0);
+            return;
+        }
+        
         for (let i = 0; i < chunkedPhotos.length; ++i) {
             const chunk = chunkedPhotos[i];
             
@@ -231,14 +246,14 @@
 </script>
 
 {#if photoModalIsOpen}
-    <PhotoSlider photos={photosMeta} photoIndex={currentPhotoIndex} closeModal={handleClosePhotoSlider} nrToPreload={2}/>
+    <PhotoSlider photos={filteredPhotosMetadata} photoIndex={currentPhotoIndex} closeModal={handleClosePhotoSlider} nrToPreload={2}/>
 {/if}
 <Options
-    photos={photosMeta}
+    photos={filteredPhotosMetadata}
     currentChunkSize={chunkSize}
     maxChunkSize={maxChunkSize}
     sortedPhotosCallback={(sortedPhotos) => {
-        photosMeta = sortedPhotos;
+        filteredPhotosMetadata = sortedPhotos;
         reChunk();
     }}
     zoomInCallback={() => {
@@ -247,20 +262,52 @@
     zoomOutCallback={() => {
         reChunk(true);
     }}
+    toggleVideosCallback={() => {
+        toggleShowOnlyVideos = !toggleShowOnlyVideos;
+        if (toggleShowOnlyVideos) {
+            filteredPhotosMetadata = originalPhotosMetadata.filter(photo => 
+                photo.type !== 'photo' &&
+                photo.lengthSeconds > 4);
+        } else {
+            filteredPhotosMetadata = originalPhotosMetadata.filter((photo) => 
+                photo.type === 'photo' || photo.lengthSeconds > 4);
+        }
+        reChunk();
+    }}
+    toggleSquareProportionsCallback={() => {
+        showSquareThumbs = !showSquareThumbs;
+        calcRowHeights(showSquareThumbs);
+    }}
     closeFromParent={closeAllModalsFromParent}
+    isVideoFiltered={toggleShowOnlyVideos}
 />
 <DatePicker 
-    photos={photosMeta} 
+    photos={filteredPhotosMetadata} 
     photoIndex={datepickerIndex} 
     chunkSize={chunkSize}
     on:setScroll={(e) => {scrollToIndex = Math.floor(e.detail / chunkSize)}}
     closeFromParent={closeAllModalsFromParent}
-/>
-<div class="text-rounded-corners no-photos">
-    {#if photosMeta.length > 0}
-        <p>{getNoPhotosFormatted()}</p>
-    {/if}
-</div>
+    />
+{#if chunkedPhotos.length > 0}
+    <div class="text-rounded-corners no-photos">
+        <p>{currentNoPhotos}</p>
+    </div>
+{/if}
+{#if chunkedPhotos.length === 0}
+    <div class="text-rounded-corners" style="
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        right: 50%;
+        width: 180px;
+        height: 25px;
+        transform: translate(-50%, -50%);
+        text-align: center;
+    ">
+        <p>No photos available</p>
+    </div>
+{/if}
+
 <div id="virtual-list-container">
     <VirtualList 
         bind:this={virtualList}
@@ -286,7 +333,9 @@
                                 id={currentPhotoMeta.guid}
                                 src="api/photos/{currentPhotoMeta.guid}/thumb"
                                 alt={currentPhotoMeta.dateTaken}
-                                style="max-height: {rowHeights[index]-2}px;"
+                                style={showSquareThumbs
+                                    ? `height: ${rowHeights[index]-2}px; width: ${rowHeights[index]-2}px; object-fit: cover;`
+                                    : `max-height: ${rowHeights[index]-2}px;`}
                             >
                             {#if currentPhotoMeta.type === 'video' || currentPhotoMeta.type === 'live-photo-video'}
                                 {#if currentPhotoMeta.lengthSeconds}
@@ -309,9 +358,9 @@
 <style>
     #virtual-list-container {
         overflow-x: hidden;
-        touch-action: pan-y; /* prevent side-dragging */
+        touch-action: pan-y;
         background-color: black;
-        z-index: 0;
+        z-index: -1;
         position: fixed;
         top: 0;
         left: 0;
@@ -319,10 +368,11 @@
     }
 
     .text-rounded-corners {
-        background-color: rgba(255,255,255,0.5);
+        box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.9);
+        background-color: rgba(255,255,255,0.7);
         color: black;
         width: fit-content;
-        border-radius: 8px;
+        border-radius: 12px;
         padding: 0 3px 0 3px;
     }
     
@@ -347,10 +397,9 @@
 
     .no-photos {
         position: fixed; 
-        z-index: 1; 
-        right: 10px; 
-        top: 10px; 
+        left: 50%;
+        top: 13px; 
         height: 25px;
-        border: 1px solid black;
+        padding: 0 5px 0 5px;
     }
 </style>

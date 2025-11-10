@@ -162,7 +162,20 @@ export async function getVideoDateTaken(filePath: string): Promise<string | null
 }
 
 export async function getDateTakenFromPath(imagePath: string): Promise<string | null> {
-    // const exiftool = new ExifTool();
+    // Check file extension to determine if it's a video
+    const ext = imagePath.split('.').pop()?.toLowerCase();
+    const videoExts = ['mp4', 'mov', 'avi', 'mkv', 'webm'];
+    if (ext && videoExts.includes(ext)) {
+        // Use ffprobe for video files
+        try {
+            const videoDate = await getVideoDateTaken(imagePath);
+            return videoDate;
+        } catch (error) {
+            console.log('Error reading video date with ffprobe:', error, imagePath);
+            return 'error-no-date-found';
+        }
+    }
+    // Otherwise, treat as image and use EXIF
     try {
         const tags = await exiftool.read(imagePath);
         // example: "2218:09:22 02:32:14"
@@ -174,25 +187,21 @@ export async function getDateTakenFromPath(imagePath: string): Promise<string | 
             return 'error-no-date-found';
         }
 
-            let dateTaken: string;
-            if (typeof dt === 'string') {
-                // Convert to "YYYY-MM-DD HH:MM:SS"
-                dateTaken = dt.replace(/^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})/, '$1-$2-$3 $4:$5:$6');
-            } else if (dt && typeof dt === 'object' && 'toISOString' in dt) {
-                // ExifDateTime object from exiftool-vendored
-                dateTaken = dt.toISOString().replace('T', ' ').substring(0, 19);
-            } else {
-                return 'error-no-date-found';
-            }
-            return dateTaken;
+        let dateTaken: string;
+        if (typeof dt === 'string') {
+            // Convert to "YYYY-MM-DD HH:MM:SS"
+            dateTaken = dt.replace(/^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})/, '$1-$2-$3 $4:$5:$6');
+        } else if (dt && typeof dt === 'object' && typeof (dt as any).toISOString === 'function') {
+            // ExifDateTime object from exiftool-vendored
+            dateTaken = (dt as any).toISOString().replace('T', ' ').substring(0, 19);
+        } else {
+            return 'error-no-date-found';
+        }
+        return dateTaken;
     } catch (error) {
         console.log('Error reading EXIF data with ExifTool:', error, imagePath);
         return 'error-no-date-found';
-    } 
-    // finally {
-        // Always clean up to prevent hanging processes
-        // await exiftool.end();
-    // }
+    }
 }
 
 // SHA-256 string to hash
@@ -228,19 +237,24 @@ export async function generateThumbnailBytes(image: Buffer, w: number, h: number
 // Generate a thumbnail from a video file using ffmpeg
 export async function generateVideoThumbnail(videoPath: string, outPath: string, w: number, h: number, timeSeconds = 1): Promise<void> {
     return new Promise((resolve, reject) => {
-        // ffmpeg command: extract frame at timeSeconds, resize, save as webp
+        // Extract frame, resize, encode as webp
         const ffmpeg = spawn('ffmpeg', [
             '-ss', String(timeSeconds), // seek to time
             '-i', videoPath,
             '-frames:v', '1', // extract one frame
             '-vf', `scale='min(${w},iw)':'min(${h},ih)':force_original_aspect_ratio=decrease`,
-            '-q:v', '3', // quality (lower is better)
+            '-c:v', 'libwebp', // use webp encoder
+            '-quality', '90', // webp quality (0-100)
+            '-lossless', '0', // lossy for better compression
+            '-preset', 'picture', // better quality for still images
+            '-pix_fmt', 'yuv420p', // color compatibility
             outPath
         ]);
         ffmpeg.on('close', (code) => {
             if (code === 0) {
                 resolve();
             } else {
+                console.log('Error generating video thumbnail, ffmpeg exited with code: ', code);
                 reject(new Error('Failed to generate video thumbnail'));
             }
         });

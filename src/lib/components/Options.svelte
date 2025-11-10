@@ -9,6 +9,9 @@
     export let sortedPhotosCallback: (photos: PhotoMetaClient[]) => void = () => {};
     export let zoomInCallback: () => void = () => {};
     export let zoomOutCallback: () => void = () => {};
+    export let toggleVideosCallback: () => void = () => {};
+    export let toggleSquareProportionsCallback: () => void = () => {};
+    export let isVideoFiltered: boolean = false;
     export let closeFromParent: boolean = false;
     
      $: if (closeFromParent) {
@@ -51,48 +54,54 @@
     }
 
     let options = [
-        {id: 0, displayName: 'Newest first', func: () => {sort(true)}, icon: 'sort-latest', disabled: isSortedByLatest},
-        {id: 1, displayName: 'Oldest first', func: () => {sort(false)}, icon: 'sort-earliest', disabled: !isSortedByLatest},
-        // {id: 2, displayName: 'Zoom in', func: () => {zoomInCallback()}, icon: 'zoom-in', disabled: currentChunkSize == 3},
-        // {id: 3, displayName: 'Zoom out', func: () => {zoomOutCallback()}, icon: 'zoom-out', disabled: isMaxChunkSize},
-        {id: 2, displayName: 'Zoom in', func: () => {zoomInCallback()}, icon: 'zoom-in'},
-        {id: 3, displayName: 'Zoom out', func: () => {zoomOutCallback()}, icon: 'zoom-out'},
+        {id: 0, displayName: 'Zoom in', func: () => {zoomInCallback()}, icon: 'zoom-in'},
+        {id: 1, displayName: 'Zoom out', func: () => {zoomOutCallback()}, icon: 'zoom-out'},
+        {id: 2, displayName: 'Newest first', func: () => {sort(true)}, icon: 'sort-latest', disabled: isSortedByLatest},
+        {id: 3, displayName: 'Oldest first', func: () => {sort(false)}, icon: 'sort-earliest', disabled: !isSortedByLatest},
+        {id: 4, displayName: 'Toggle videos', func: () => {toggleVideosCallback()}, icon: isVideoFiltered ? 'video-off' : 'video'},
+        {id: 5, displayName: 'Toggle square', func: () => {toggleSquareProportionsCallback()}},
     ]
 
 </script>
 
-<div id="options" class="text-rounded-corners">
+<button id="options" class="text-rounded-corners">
     {#if !isModalOpen}
-    <div class="hamburger-icon" transition:slide></div>
+        <div class="hamburger-icon" transition:slide={{duration: 200}}></div>
     {:else}
-    <ul transition:slide>
-        {#each options as {displayName, func, icon, disabled}}
-            <li transition:slide
-                on:click={() => func()}
-                class="option-item {disabled ? 'disabled' : ''}"
-                style={`--icon-url: url('${icon}.svg')`}
-                >
-            {displayName}</li>
-        {/each}
-    </ul>
-{/if}
-</div>
+        <ul transition:slide={{duration: 200}}>
+            {#each options as {displayName, func, icon, disabled}}
+                <li>
+                    <button class="option-item {disabled ? 'disabled' : ''}"
+                        on:click={() => func()}
+                        style={`--icon-url: url('${icon}.svg')`}>
+                        {displayName}
+                    </button>
+                </li>
+            {/each}
+        </ul>
+    {/if}
+</button>
 
 <style>
     #options {
         cursor: pointer;
         text-align: left;
-        font-size: 22px;
-        font-weight: 400;
-        top: 50px;
+        font-size: 20px;
+        top: 10px;
         right: 10px;
-        z-index: 1;
         position: fixed;
-        padding: 3px 3px 3px 3px;
         align-items: center;
-        border: 1px solid black;
+        box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.9);
+        z-index: 1;
     }
-
+    
+    button {
+        color: black;
+        background: none;
+        border: none;
+        padding: 0;
+    }
+    
     .hamburger-icon {
         width: 32px;
         height: 32px;
@@ -101,15 +110,19 @@
         margin: 5px 5px 5px 5px;
         border-radius: 30px;
     }
-
-    #options ul {
+    
+    ul {
+        border: 1px solid black;
+        border-radius: 12px;
+        background-color: rgba(255,255,255,0.8);
         max-height: 100%; 
         margin: 0;
         list-style: none;
         list-style-type: none;
         text-align: right;
         padding-left: 32px;
-        margin: 5px;
+        padding: 5px;
+        width: 170px;
     }
 
     .option-item::before {
@@ -130,8 +143,7 @@
     .text-rounded-corners {
         background-color: rgba(255,255,255,0.7);
         width: fit-content;
-        border-radius: 30px;
+        border-radius: 12px;
         margin: 0;
     }
-
 </style>
