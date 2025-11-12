@@ -3,6 +3,7 @@
     import { type PhotoMetaClient } from "$api";
     import { fade, slide } from 'svelte/transition';
     import { createEventDispatcher } from 'svelte';
+    import { cubicOut } from 'svelte/easing';
 
     export let photos: Array<PhotoMetaClient> = [];
     export let photoIndex: number = 0;
@@ -29,6 +30,10 @@
         const target = e.target as HTMLElement;
         if (target.closest('#datepicker')) {
             isDatePickerOpen = !isDatePickerOpen;
+            setTimeout(() => {
+                const target = document.getElementsByClassName("selected-date").item(0);
+                target.scrollIntoView({ behavior: "smooth", block: "center" });
+            }, 500);
         } else {
             isDatePickerOpen = false;
         }
@@ -77,21 +82,58 @@
         };
         return datesSet;
     }
+    
+    // Custom transition that handles both size and position
+    function slideAndResizeSequential(node: HTMLElement, { duration = 400, easing = cubicOut } = {}) {
+        const style = getComputedStyle(node);
+        const height = parseFloat(style.height);
+        const width = parseFloat(style.width);
+        const opacity = +style.opacity;
 
+        return {
+            duration,
+            css: (t: number) => {
+                // detect if we're entering (t increasing) or leaving (t decreasing)
+                const isEntering = t > 0.5; // crude but effective check for visual direction
+
+                let widthProgress = 0, heightProgress = 0;
+
+                if (t >= 0 && t <= 1) {
+                    if (isEntering) {
+                        // entering (0 → 1): width first, then height
+                        widthProgress = t < 0.5 ? easing(t * 2) : 1;
+                        heightProgress = t < 0.5 ? 0 : easing((t - 0.5) * 2);
+                    } else {
+                        // leaving (1 → 0): height first, then width
+                        const reversedT = 1 - t;
+                        heightProgress = reversedT < 0.5 ? easing(1 - reversedT * 2) : 0;
+                        widthProgress = reversedT < 0.5 ? 1 : easing(1 - (reversedT - 0.5) * 2);
+                    }
+                }
+
+                return `
+                    opacity: ${t * opacity};
+                    transform: translateY(${(1 - t) * -5}px);
+                    width: ${widthProgress * width}px;
+                    height: ${heightProgress * height}px;
+                `;
+            }
+        };
+    }
 </script>
 
-<button id="datepicker" class="text-rounded-corners current-date {isDatePickerOpen ? 'full-height' : '' }">
+<button id="datepicker" class="text-rounded-corners current-date">
     {#if !isDatePickerOpen}
-        <div>{getDateFormattedShort(photos[photoIndex])}</div>
+        <div transition:slideAndResizeSequential={{duration: 300}}>{getDateFormattedShort(photos[photoIndex])}</div>
     {:else}
-        <ul id="datelist" transition:slide={{duration: 200}}>
+        <ul id="datelist" class="full-height" transition:slideAndResizeSequential={{duration: 300}}>
             {#each getAllDatesFormattedShort() as {index, dateAsString}}
-            <li>
-                <button class={dateAsString == getDateFormattedShort(photos[photoIndex]) ? "selected-date" : ""}
-                        on:click={() => dispatch("setScroll", index)}>
-                    {dateAsString}
-                </button>
-            </li>
+                <li>
+                    <button class={dateAsString == getDateFormattedShort(photos[photoIndex]) ? "selected-date" : ""}
+                            on:click={() => dispatch("setScroll", index)}>
+                        {dateAsString}
+                    </button>
+                </li>
             {/each}
         </ul>
     {/if}
@@ -100,18 +142,24 @@
 <style>
     #datepicker {
         cursor: pointer;
-        text-align: right;
-        font-size: 20px; 
+        font-size: 18px; 
         left: 10px; 
         top: 10px;
         text-align: center;
-        color: black;
+        color: darkslategray;
         align-items: center;
         box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.9);
         z-index: 1;
+        border: 1px solid white;
+    }
+
+    #datepicker div {
+        padding: 0 8px;
+        width: fit-content;
     }
     
     button {
+        overflow: hidden;
         color: black;
         background: none;
         border: none;
@@ -119,7 +167,7 @@
     }
     
     .full-height {
-        height: 50%;
+        height: 50dvh;
     }
     
     .selected-date {
@@ -127,23 +175,31 @@
     }
     
     ul {
-        border: 1px solid black;
         border-radius: 12px;
         background-color: rgba(255,255,255,0.8);
-        padding: 0px 3px 0px 0px;
         max-height: 100%; 
-        overflow-y: auto;
+        margin: 0;
+        list-style: none;
+        list-style-type: none;
         text-align: right;
+        padding: 0px 3px 0px 3px;
+        text-align: right;
+        overflow-y: auto;
+    }
+
+    
+    li {
+        margin: 4px 0;
     }
 
     .text-rounded-corners {
         background-color: rgba(255,255,255,0.7);
+        width: fit-content;
         border-radius: 12px;
-        padding: 0 0px 0 0px;
+        margin: 0;
     }
 
     .current-date {
         position: fixed;
-        width: 160px;
     }
 </style>

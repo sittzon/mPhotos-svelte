@@ -300,6 +300,13 @@
   const handleResize = () => {
     viewportWidth = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
   };
+
+    // Format seconds as mm:ss
+  function formatDuration(seconds: number): string {
+      const m = Math.floor(seconds / 60);
+      const s = Math.floor(seconds % 60);
+      return `${m}:${s.toString().padStart(2, '0')}`;
+  }
 </script>
 
 <div id="slider" on:touchstart={onTouchStart} on:touchmove={onTouchMove} on:touchend={onTouchEnd} role="navigation">
@@ -308,7 +315,7 @@
     <button class="arrow right fadeout" on:click={next} >›</button>
     <button class="close-button fadeout" on:click={() => { resetSlider(); closeModal(); }}>✖</button>
 
-    <div class="text-rounded-corners date fadeout5s">
+    <div class="text-rounded-corners date fadeout5s" style="opacity:{slideshowOpacity};">
       <p>{getDateFormattedLong(photos[currentIndex])}</p>
     </div>
   {/if}
@@ -324,20 +331,25 @@
           </video>
         {:else}
           <img
-          src={photo.medium}
-          class="slide 
-            {i === nrToPreload ? 'current' : i < nrToPreload ? 'previous' : 'next'} 
-            {animating ? 'animating' : ''}
-            "
-          alt={photo.dateTaken}
-          style="transform: {transforms[i]};"
+            src={photo.medium}
+            class="slide 
+              {i === nrToPreload ? 'current' : i < nrToPreload ? 'previous' : 'next'} 
+              {animating ? 'animating' : ''}
+              "
+            alt={photo.dateTaken}
+            style="transform: {transforms[i]};"
           />
-          {#if photo.type === 'video' && !isVideoPlaying}
-            <button class="play-icon {animating ? 'animating' : ''}" 
-              on:click={() => isVideoPlaying = true}
-              style="transform: {transforms[i]}"
-              >
-            </button>
+          {#if photo.type === 'video' && !isVideoPlaying && i === nrToPreload}
+            <div style="display: flex; align-items: center; flex-direction: column; justify-content: center; height: 100%">
+              <button class="play-icon {animating ? 'animating' : ''}" 
+                on:click={() => isVideoPlaying = true}
+                style="transform: {transforms[i]}"
+              />
+              <span class="video-duration-overlay {animating ? 'animating' : ''}"
+                style="transform: {transforms[i]}">
+                {formatDuration(photo.lengthSeconds)}
+              </span>
+            </div>
           {/if}
         {/if}
       {/each}
@@ -374,7 +386,6 @@
   button {
       color: black;
       background: none;
-      border: none;
       padding: 0;
   }
 
@@ -410,6 +421,7 @@
   }
 
   .arrow {
+    box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.9);
     position: absolute;
     z-index: 20;
     top: 50%;
@@ -429,6 +441,7 @@
   .arrow.left { left: 8px; }
   .arrow.right { right: 8px; }
   .close-button {
+    box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.9);
     position: absolute;
     z-index: 20;
     top: 16px;
@@ -470,6 +483,7 @@
   }
   
   .text-rounded-corners {
+      box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.9);
       z-index: 20;
       background-color: rgba(255,255,255,0.7);
       width: fit-content;
@@ -477,26 +491,36 @@
       padding: 0 3px 0 3px;
   }
 
+  .video-duration-overlay {
+    
+      background: rgba(0,0,0,0.3);
+      color: #fff;
+      font-size: 0.7em;
+      padding: 2px 2px;
+      border-radius: 4px;
+      z-index: 15;
+      pointer-events: none;
+  }
+
   .date {
+      box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.9);
       position: fixed; 
       z-index: 20; 
       height: 25px;
       top: 0px;
       left: 50%;
       transform: translate(-50%, 0);
+      pointer-events: none;
   }
 
   .play-icon {
+      border: none;
+      filter: drop-shadow(1px 1px 5px rgba(0, 0, 0, 0.9));
       content: '';
-      position: absolute;
       width: 64px;
       height: 64px;
-      left: 45%;
-      right: 45%;
-      top: 45%;
       background: url('play-icon.svg') no-repeat center;
       background-size: contain;
       z-index: 15;
   }
-
 </style>

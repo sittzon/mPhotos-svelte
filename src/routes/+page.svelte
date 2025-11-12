@@ -43,7 +43,7 @@
         chunkSize = tempChunkSize? +tempChunkSize : chunkSize;
 
         // Fetch metadata
-        const dbMetadataList = "/api/photos"
+        const dbMetadataList = "/api/metadata"
         
         await fetch(dbMetadataList, {
             method: 'GET',
@@ -82,6 +82,7 @@
         // Add event listeners
         window.addEventListener("orientationchange", () => calcRowHeights(showSquareThumbs));
         window.addEventListener("resize", () => calcRowHeights(showSquareThumbs));
+        window.addEventListener("scroll", () => {isFingerDown = true; handleCloseAllModals()});
         window.addEventListener("touchstart", handleTouchStart);
         window.addEventListener("touchend", handleTouchEnd);
         window.addEventListener("touchcancel", handleTouchEnd);
@@ -243,6 +244,20 @@
         const s = Math.floor(seconds % 60);
         return `${m}:${s.toString().padStart(2, '0')}`;
     }
+
+    const toggleVideosCallback = () => {
+        toggleShowOnlyVideos = !toggleShowOnlyVideos;
+        console.log("Toggling video filter, now:", toggleShowOnlyVideos);
+        if (toggleShowOnlyVideos) {
+            filteredPhotosMetadata = originalPhotosMetadata.filter(photo => 
+                photo.type !== 'photo' &&
+                photo.lengthSeconds > 4);
+        } else {
+            filteredPhotosMetadata = originalPhotosMetadata.filter((photo) => 
+                photo.type === 'photo' || photo.lengthSeconds > 4);
+        }
+        reChunk();
+    }
 </script>
 
 {#if photoModalIsOpen}
@@ -263,16 +278,7 @@
         reChunk(true);
     }}
     toggleVideosCallback={() => {
-        toggleShowOnlyVideos = !toggleShowOnlyVideos;
-        if (toggleShowOnlyVideos) {
-            filteredPhotosMetadata = originalPhotosMetadata.filter(photo => 
-                photo.type !== 'photo' &&
-                photo.lengthSeconds > 4);
-        } else {
-            filteredPhotosMetadata = originalPhotosMetadata.filter((photo) => 
-                photo.type === 'photo' || photo.lengthSeconds > 4);
-        }
-        reChunk();
+        toggleVideosCallback();
     }}
     toggleSquareProportionsCallback={() => {
         showSquareThumbs = !showSquareThumbs;
@@ -280,6 +286,7 @@
     }}
     closeFromParent={closeAllModalsFromParent}
     isVideoFiltered={toggleShowOnlyVideos}
+    arePhotosSquare={showSquareThumbs}
 />
 <DatePicker 
     photos={filteredPhotosMetadata} 
@@ -287,23 +294,14 @@
     chunkSize={chunkSize}
     on:setScroll={(e) => {scrollToIndex = Math.floor(e.detail / chunkSize)}}
     closeFromParent={closeAllModalsFromParent}
-    />
+/>
 {#if chunkedPhotos.length > 0}
-    <div class="text-rounded-corners no-photos">
+    <div class="text-rounded-corners nr-of-photos">
         <p>{currentNoPhotos}</p>
     </div>
 {/if}
 {#if chunkedPhotos.length === 0}
-    <div class="text-rounded-corners" style="
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        right: 50%;
-        width: 180px;
-        height: 25px;
-        transform: translate(-50%, -50%);
-        text-align: center;
-    ">
+    <div class="text-rounded-corners no-photos-available">
         <p>No photos available</p>
     </div>
 {/if}
@@ -355,6 +353,17 @@
     </VirtualList>
 </div>
 
+<!-- <div class="bottom-bar">
+    <div>
+        <div>
+            <button id="library-button" class="interface"></button>
+        </div>
+        <div>
+            <button id="deleted-button" class="interface"></button>
+        </div>
+    </div>
+</div> -->
+
 <style>
     #virtual-list-container {
         overflow-x: hidden;
@@ -370,7 +379,7 @@
     .text-rounded-corners {
         box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.9);
         background-color: rgba(255,255,255,0.7);
-        color: black;
+        color: darkslategray;
         width: fit-content;
         border-radius: 12px;
         padding: 0 3px 0 3px;
@@ -395,11 +404,68 @@
         max-width: 100%;
     }
 
-    .no-photos {
-        position: fixed; 
-        left: 50%;
-        top: 13px; 
+    .nr-of-photos {
+        position: fixed;
+        left: 10px;
+        top: 45px; 
         height: 25px;
         padding: 0 5px 0 5px;
     }
+
+    .no-photos-available {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        right: 50%;
+        width: 180px;
+        height: 25px;
+        transform: translate(-50%, -50%);
+        text-align: center;
+    }
+
+    .interface {
+        box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.9);
+        border-radius: 12px;
+    }
+    
+    .bottom-bar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 80px;
+    }
+
+    .bottom-bar div {
+        display: flex; 
+        justify-content: center; 
+        align-items: center; 
+        height: 100%;
+    }
+
+    .bottom-bar div div {
+        background-color: rgba(255,255,255,0.7);
+        border-radius: 12px;
+        height: 48px;
+        width: 48px;
+        margin: 0 10px 0 10px;
+    }
+    
+    .bottom-bar div button {
+        height: 48px;
+        width: 48px;
+        border: 1px solid white;
+        color: black;
+    }
+
+    #library-button {
+        background: url('library.svg') no-repeat center;
+        background-size: contain;
+    }
+
+    #deleted-button {
+        background: url('deleted.svg') no-repeat center;
+        background-size: contain;
+    }
+
 </style>
