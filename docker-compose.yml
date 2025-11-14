@@ -1,13 +1,13 @@
 services:
   client:
-    image: mphotos-svelte
-    container_name: mPhotos-svelte
+    image: mphotos
+    container_name: mPhotos
     build:
       context: .
       dockerfile: ./Dockerfile
     ports:
       - 5174:5174
     volumes:
-      # Map originals folder, and area for thumbnails to be created
+      # Map originals directory and directory for thumbnails to be created
       - :/originals
       - :/thumbs

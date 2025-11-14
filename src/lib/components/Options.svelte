@@ -114,7 +114,7 @@
                 <li>
                     <button class="option-item {disabled ? 'disabled' : ''}"
                         on:click={() => func()}
-                        style={`--icon-url: url('${icon}.svg')`}>
+                        style={`--icon-url: url('/${icon}.svg')`}>
                         {displayName}
                     </button>
                 </li>
@@ -147,7 +147,7 @@
     .hamburger-icon {
         width: 32px;
         height: 32px;
-        background: url('hamburger.svg') no-repeat center;
+        background: url('/hamburger.svg') no-repeat center;
         background-size: contain;
         margin: 5px 5px 5px 5px;
         border-radius: 30px;

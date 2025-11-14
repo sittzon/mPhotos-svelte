@@ -3,9 +3,11 @@ import fs from 'fs/promises';
 import path from 'path';
 import { config } from '$config';
 
+const thumbsDir = config.GENERATED_THUMBNAILS || '/thumbs';
+
 export const GET: RequestHandler = async ({ params }) => {
     const guid = params.guid as string;
-    const fileName = path.join(config.GENERATED_THUMBNAILS, guid + '.webp');
+    const fileName = path.join(thumbsDir, guid + '.webp');
     const exists = await fs.stat(fileName).then(() => true).catch(() => false);
     if (!exists) return new Response('Not found', { status: 404 });
     const b = await fs.readFile(fileName);

@@ -7,10 +7,10 @@ import { getImageDimensions, getVideoDimensions, getVideoDuration, generateVideo
 import { getFileInfosRecursively, photosMetaCacheKey } from '$helpers/filehelper';
 import { memoryCache } from '$helpers/memorycache';
 
-const metaDataFilename = path.join(config.GENERATED_THUMBNAILS, config.METADATA_FILE || 'metadata.json');
-const errorLogFilename = path.join(config.GENERATED_THUMBNAILS, config.ERRORS_FILE || 'errors.log');
 const originalsDir = config.ORIGINAL_PHOTOS || '/originals';
 const thumbsDir = config.GENERATED_THUMBNAILS || '/thumbs';
+const metaDataFilename = path.join(thumbsDir, config.METADATA_FILE || 'metadata.json');
+const errorLogFilename = path.join(thumbsDir, config.ERRORS_FILE || 'errors.log');
 const thumbnailSizeWidth = config.THUMBNAIL_SIZE || 300;
 const mediumSizeWidth = config.MEDIUM_SIZE || 1200;
 const videoExts = ['.mp4', '.mov'];
