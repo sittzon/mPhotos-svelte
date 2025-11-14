@@ -58,9 +58,12 @@ async function loadPhotos() {
             }
         } catch {}
 
+        console.log(`Indexing ${originalPhotos.length} new photos/videos`);
+
         let i = 0;
         // originalPhotos now only contains new photos to index
         for (const fileInfo of originalPhotos) {
+            console.log(`Indexing: ${fileInfo.FullName}`);
             try {
                 // If video, then use getVideoDimensions
                 let bytes: Buffer;

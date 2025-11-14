@@ -167,7 +167,7 @@
     }
     
     .full-height {
-        height: 50dvh;
+        max-height: 50dvh;
     }
     
     .selected-date {

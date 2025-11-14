@@ -519,7 +519,7 @@
       content: '';
       width: 64px;
       height: 64px;
-      background: url('play-icon.svg') no-repeat center;
+      background: url('/play-icon.svg') no-repeat center;
       background-size: contain;
       z-index: 15;
   }

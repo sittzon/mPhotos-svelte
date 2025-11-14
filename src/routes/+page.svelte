@@ -459,12 +459,12 @@
     }
 
     #library-button {
-        background: url('library.svg') no-repeat center;
+        background: url('/library.svg') no-repeat center;
         background-size: contain;
     }
 
     #deleted-button {
-        background: url('deleted.svg') no-repeat center;
+        background: url('/deleted.svg') no-repeat center;
         background-size: contain;
     }
 

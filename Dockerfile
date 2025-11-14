@@ -1,5 +1,7 @@
 FROM node:24.11.1-trixie-slim AS build
 
+RUN apt-get update && apt-get install -y ffmpeg
+
 WORKDIR /app
 COPY /package.json .
 COPY /package-lock.json .
