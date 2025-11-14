@@ -33,7 +33,7 @@
             setTimeout(() => {
                 const target = document.getElementsByClassName("selected-date").item(0);
                 target.scrollIntoView({ behavior: "smooth", block: "center" });
-            }, 500);
+            }, 300);
         } else {
             isDatePickerOpen = false;
         }
