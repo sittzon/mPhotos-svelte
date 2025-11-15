@@ -11,6 +11,8 @@
     let virtualList: VirtualList;
     let originalPhotosMetadata : Array<PhotoMetaClient> = [];
     let filteredPhotosMetadata : Array<PhotoMetaClient> = [];
+    let onlyVideosMetadata : Array<PhotoMetaClient> = [];
+    let photosAndVideosMetadata : Array<PhotoMetaClient> = [];
     let chunkedPhotos : Array<Array<PhotoMetaClient>> = [];
     let currentPhoto: PhotoMetaClient;
     let datepickerIndex: number = 0;
@@ -38,9 +40,12 @@
     {
         windowHeight = window.innerHeight;
 
-        // Set chunkSize according to cookie value
-        const tempChunkSize = getCookie('chunkSize');
+        const tempChunkSize = getCookie('mphotos-zoomLevel');
+        const tempFilterOnlyVideos = getCookie('mphotos-filterOnlyVideos');
+        const tempSquareProportions = getCookie('mphotos-squareProportions');
         chunkSize = tempChunkSize? +tempChunkSize : chunkSize;
+        toggleShowOnlyVideos = tempFilterOnlyVideos === 'true' ? true : false;
+        showSquareThumbs = tempSquareProportions === 'true' ? true : false;
 
         // Fetch metadata
         const dbMetadataList = "/api/metadata"
@@ -72,8 +77,14 @@
             });
             
             // Originally filter out live-photo-videos 
-            filteredPhotosMetadata = originalPhotosMetadata
+            onlyVideosMetadata = originalPhotosMetadata
+                .filter((photo: PhotoMetaClient) => photo.type == 'video');
+            photosAndVideosMetadata = originalPhotosMetadata
                 .filter((photo: PhotoMetaClient) => photo.type != 'live-photo-video');
+            filteredPhotosMetadata = photosAndVideosMetadata
+            if (toggleShowOnlyVideos) {
+                filteredPhotosMetadata = filteredPhotosMetadata.filter((photo: PhotoMetaClient) => photo.type == 'video');
+            }
             if (filteredPhotosMetadata.length > 0) {
                 reChunk();
             }
@@ -161,7 +172,7 @@
                 index -= 1;
             }
             chunkSize = currentChunkSizeArray[index];
-            setCookie('chunkSize', chunkSize.toString());
+            setCookie('mphotos-zoomLevel', chunkSize.toString());
         }
         chunkedPhotos = chunkPhotos(filteredPhotosMetadata, chunkSize);
 
@@ -248,13 +259,11 @@
     const toggleVideosCallback = () => {
         toggleShowOnlyVideos = !toggleShowOnlyVideos;
         console.log("Toggling video filter, now:", toggleShowOnlyVideos);
+        setCookie('mphotos-filterOnlyVideos', toggleShowOnlyVideos.toString());
         if (toggleShowOnlyVideos) {
-            filteredPhotosMetadata = originalPhotosMetadata.filter(photo => 
-                photo.type !== 'photo' &&
-                photo.lengthSeconds > 4);
+            filteredPhotosMetadata = onlyVideosMetadata;
         } else {
-            filteredPhotosMetadata = originalPhotosMetadata.filter((photo) => 
-                photo.type === 'photo' || photo.lengthSeconds > 4);
+            filteredPhotosMetadata = photosAndVideosMetadata;
         }
         reChunk();
     }
@@ -283,6 +292,7 @@
     toggleSquareProportionsCallback={() => {
         showSquareThumbs = !showSquareThumbs;
         calcRowHeights(showSquareThumbs);
+        setCookie('mphotos-squareProportions', showSquareThumbs.toString());
     }}
     closeFromParent={closeAllModalsFromParent}
     isVideoFiltered={toggleShowOnlyVideos}
