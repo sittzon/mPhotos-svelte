@@ -43,6 +43,7 @@
         const tempChunkSize = getCookie('mphotos-zoomLevel');
         const tempFilterOnlyVideos = getCookie('mphotos-filterOnlyVideos');
         const tempSquareProportions = getCookie('mphotos-squareProportions');
+        const tempScrollToIndex = getCookie('mphotos-scrollToIndex');
         chunkSize = tempChunkSize? +tempChunkSize : chunkSize;
         toggleShowOnlyVideos = tempFilterOnlyVideos === 'true' ? true : false;
         showSquareThumbs = tempSquareProportions === 'true' ? true : false;
@@ -87,6 +88,9 @@
             }
             if (filteredPhotosMetadata.length > 0) {
                 reChunk();
+                setTimeout(() => {
+                    scrollToIndex = tempScrollToIndex ? +tempScrollToIndex : -1;
+                }, 10);
             }
         });
 
@@ -247,6 +251,11 @@
         const middlePhotoRow = start + Math.floor((end - start) / 2);
         const photoIndex = middlePhotoRow * chunkSize;
         datepickerIndex = photoIndex;
+        const tempScrollIndex = getCookie('mphotos-scrollToIndex');
+        if (tempScrollIndex && +tempScrollIndex === middlePhotoRow) {
+            return;
+        }
+        setCookie('mphotos-scrollToIndex', middlePhotoRow.toString());
     }
     
     // Format seconds as mm:ss
