@@ -13,7 +13,6 @@ Specify your originals directory and where you would like your thumbnails to be 
 
 *Optional:* Use THUMBNAIL_SIZE and MEDIUM_SIZE variables to tweak size of thumbnails and images used in PhotoSlider. The METADATA_FILE and ERRORS_FILE can also be specified, defaults to 'metadata.json' and 'errors.log';
 
-
 - `npm install`
 - `npm run host`
 
@@ -24,5 +23,5 @@ Define variables in **config.ts** and then run:
 
 ## Usage
 - Click the DatePicker in the top right to display a list of all known photo dates. Click on a date to go to that date in the grid. **Note:** List of dates is scrollable.
-- Swipe up or down in the Photoslider to close. Swipe left or right to switch photo.
+- Swipe down in the Photoslider to close. Swipe up to show details for current photo. Swipe left or right to switch photo.
 - Click on Options to get a list of zooming, sorting and filtering options. Zoom levels (number of photos per row), depends on viewport width.

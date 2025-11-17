@@ -2,6 +2,7 @@
   import { onMount, onDestroy  } from "svelte";
   import { type PhotoMetaClient } from "$api";
   import ThumbnailStrip from '$components/ThumbnailStrip.svelte';
+  import { slide } from 'svelte/transition';
 
   export let photos: Array<PhotoMetaClient> = [];
   export let closeModal = () => {}; // Feedback close to parent
@@ -30,7 +31,7 @@
   let isVideoPlaying: boolean = false;
 
   $: viewportWidth = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-  let isInformationShown: boolean = false;
+  let isDetailsShown: boolean = false;
   let slideshowOpacity = 1; // Opacity of entire slideshow, used when dragging up/down to close
   const amountOfPixelsToClose = 100; // Pixels to drag before closing
   const amountOfPixelsForFadeout = 150; // Pixels to drag until opacity 100%
@@ -105,7 +106,7 @@
       closeModal();
     }
     if (key.code=='KeyI') {
-      isInformationShown = !isInformationShown;
+      isDetailsShown = !isDetailsShown;
     }
   }
   
@@ -160,6 +161,7 @@
   let closeOnTouchEnd = false; // Whether to close modal on touch end
   let nextOnTouchEnd = false; // Whether to go to next photo on touch end
   let prevOnTouchEnd = false; // Whether to go to previous photo on touch end
+  let hasSwitchedDetailsInfo = false; // To prevent multiple toggles of info on single swipe
 
   const getDistance = (touches: TouchList) => {
     const dx = touches[0].clientX - touches[1].clientX;
@@ -201,7 +203,7 @@
       translateX /= 2; // Slow down panning
       translateY /= 2;
     }
-    // One finger, swipe to change photo or up/down to close
+    // One finger, swipe to change photo, down to close, up to show info
     else
     {
       diffX = startX + lastTranslateX - e.touches[0].clientX;
@@ -223,9 +225,10 @@
         changingSlide = true;
         prevOnTouchEnd = true;
       }
-      // Drag vertically to close
-      if(!changingSlide && Math.abs(diffY) > amountOfPixelsToActivateFade) {
-        // Start dragging photo vertically
+      // Drag down to close
+      if(!changingSlide && Math.abs(diffY) > amountOfPixelsToActivateFade && diffY < amountOfPixelsToActivateFade) {
+        isDetailsShown = false;
+        // Start dragging photo up to close
         closingSlide = true;
         scale = 1 - Math.abs(diffY)/1000;
         rotate = diffY/20;
@@ -238,10 +241,19 @@
           closeOnTouchEnd = false;
         }
       }
+      // Drag up to show info
+      if (!changingSlide && Math.abs(diffY) > amountOfPixelsToActivateFade && diffY > amountOfPixelsToActivateFade) {
+        diffX = 0;
+        if (!hasSwitchedDetailsInfo) {
+          isDetailsShown = !isDetailsShown;
+          hasSwitchedDetailsInfo = true;
+        }
+      }
     }
   }
 
   const onTouchEnd = () => {
+    hasSwitchedDetailsInfo = false;
     diffX = 0;
     diffY = 0;
     animating = true;
@@ -340,7 +352,7 @@
             style="transform: {transforms[i]};"
           />
           {#if photo.type === 'video' && !isVideoPlaying && i === nrToPreload}
-            <div style="display: flex; align-items: center; flex-direction: column; justify-content: center; height: 100%">
+            <div class="play-icon-container">
               <button class="play-icon {animating ? 'animating' : ''}" 
                 on:click={() => isVideoPlaying = true}
                 style="transform: {transforms[i]}"
@@ -354,14 +366,23 @@
         {/if}
       {/each}
     </div>
-  {#if isInformationShown}
-    <div class="text-rounded-corners" style="position: absolute; bottom: 10px; left: 50%; right: 50%; width: 300px; transform: translateX(-50%); z-index: 20; ">
-      <p>{photos[currentIndex].name}</p>
-      <p>{photos[currentIndex].width}x{photos[currentIndex].height}</p>
-      <p>{photos[currentIndex].sizeKb} Kb</p>
+  {#if isDetailsShown}
+    <div class="text-rounded-corners details" transition:slide={{duration: 200}}>
+      <div>
+        <b>Name:</b>
+        <p>{photos[currentIndex].name}</p>
+      </div>
+      <div>
+        <b>Resolution:</b>
+        <p>{photos[currentIndex].width}x{photos[currentIndex].height} px</p>
+      </div>
+      <div>
+        <b>Size:</b>
+        <p>{photos[currentIndex].sizeKb} Kb</p>
+      </div>
     </div>
   {/if}
-  {#if scale <= 1}
+  {#if scale <= 1 && !isVideoPlaying}
     <ThumbnailStrip
       photos={photos}
       currentIndex={currentIndex}
@@ -387,6 +408,7 @@
       color: black;
       background: none;
       padding: 0;
+      border: 1px solid white;
   }
 
   .slideshow {
@@ -487,12 +509,11 @@
       z-index: 20;
       background-color: rgba(255,255,255,0.7);
       width: fit-content;
-      border-radius: 3px;
-      padding: 0 3px 0 3px;
+      border-radius: 12px;
+      padding: 0 6px 0 6px;
   }
 
   .video-duration-overlay {
-    
       background: rgba(0,0,0,0.3);
       color: #fff;
       font-size: 0.7em;
@@ -507,10 +528,18 @@
       position: fixed; 
       z-index: 20; 
       height: 25px;
-      top: 0px;
+      top: 10px;
       left: 50%;
       transform: translate(-50%, 0);
       pointer-events: none;
+  }
+
+  .play-icon-container {
+      display: flex; 
+      align-items: center; 
+      flex-direction: column; 
+      justify-content: center; 
+      height: 100%;
   }
 
   .play-icon {
@@ -522,5 +551,22 @@
       background: url('/play-icon.svg') no-repeat center;
       background-size: contain;
       z-index: 15;
+  }
+
+  .details {
+      position: absolute; 
+      bottom: 60px; 
+      left: 50%; 
+      right: 50%; 
+      width: 300px; 
+      transform: translateX(-50%); 
+      z-index: 20;
+      padding: 6px 6px 0 6px;
+  }
+
+  .details > div {
+    display: flex;
+    justify-content: space-between;
+    line-height: 0.8;
   }
 </style>
