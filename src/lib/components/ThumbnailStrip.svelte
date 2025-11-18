@@ -1,9 +1,11 @@
 <script>
   import { createEventDispatcher, onMount, onDestroy } from 'svelte';
+  import { slide } from 'svelte/transition';
 
   export let photos = [];
   export let currentIndex = 0;
   export let visibleRange = 3;
+  export let closingSlide = false;
 
   const dispatch = createEventDispatcher();
   let container;
@@ -39,8 +41,8 @@
   };
 </script>
 
-{#if isPortrait}
-  <div class="thumbnail-strip" bind:this={container}>
+{#if isPortrait && !closingSlide}
+  <div class="thumbnail-strip" bind:this={container} transition:slide={{duration: 200}}>
     {#each visiblePhotos as photo, i}
     <button
       on:click={() => handleClick(start + i)}

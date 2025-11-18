@@ -18,16 +18,14 @@
     let datepickerIndex: number = 0;
     let currentPhotoIndex: number = 0;
     let rowHeights: Array<number> = [];
-    let chunkSize: number =  3;
-    let chunkSizesLarge: Array<number> =  [3,5,7,9,12];
-    let chunkSizesMedium: Array<number> =  [3,5,7,9];
-    let chunkSizesSmall: Array<number> =  [3,5,7];
+    let chunkSize: number =  5;
+    const minChunkSize: number = 3; // No less than 3 columns
+    let maxChunkSize: number = 12; // Varies based on window width
     let photoModalIsOpen: boolean = false;
     let windowHeight: number = 1000;
     let scrollToIndex: number | null = null;
     let closeAllModalsFromParent = false;
     let isFingerDown: boolean = false;
-    let maxChunkSize: number = 7;
     let toggleShowOnlyVideos: boolean = false;
     let showSquareThumbs: boolean = false; // false = original aspect ratio, true = square
 
@@ -40,6 +38,7 @@
     {
         windowHeight = window.innerHeight;
 
+        // Read and set options from cookies
         const tempChunkSize = getCookie('mphotos-zoomLevel');
         const tempFilterOnlyVideos = getCookie('mphotos-filterOnlyVideos');
         const tempSquareProportions = getCookie('mphotos-squareProportions');
@@ -78,16 +77,17 @@
             });
             
             // Originally filter out live-photo-videos 
-            onlyVideosMetadata = originalPhotosMetadata
-                .filter((photo: PhotoMetaClient) => photo.type == 'video');
             photosAndVideosMetadata = originalPhotosMetadata
                 .filter((photo: PhotoMetaClient) => photo.type != 'live-photo-video');
+            onlyVideosMetadata = photosAndVideosMetadata
+                .filter((photo: PhotoMetaClient) => photo.type == 'video');
             filteredPhotosMetadata = photosAndVideosMetadata
             if (toggleShowOnlyVideos) {
                 filteredPhotosMetadata = filteredPhotosMetadata.filter((photo: PhotoMetaClient) => photo.type == 'video');
             }
             if (filteredPhotosMetadata.length > 0) {
-                reChunk();
+                setChunkedPhotos();
+                // Set scroll position after element is rendered
                 setTimeout(() => {
                     scrollToIndex = tempScrollToIndex ? +tempScrollToIndex : -1;
                 }, 10);
@@ -135,6 +135,7 @@
         document.cookie = key + '=' + value;
     }
 
+    // Resets fadeout animation on element
     const resetFade = (el: HTMLElement) => {
         // Reset the animation by removing and re-adding the class
         el.classList.remove('fadeout');
@@ -142,8 +143,8 @@
         el.classList.add('fadeout');
     }
 
-    // Split array into groups of 'n'
-    const chunkPhotos = (array: Array<PhotoMetaClient>, size: number) => {
+    // Split any array into groups of n size
+    const chunkArray = (array: Array<any>, size: number) => {
         const chunked = [];
         for (let i = 0; i < array.length; i += size) {
             chunked.push(array.slice(i, i + size));
@@ -151,39 +152,42 @@
         return chunked;
     }
 
-    const reChunk = (increaseChunkSize: boolean | null = null) => {
-        // Check window width
-        // Small screens should not have ability to have large chunk sizes
-        const windowInnerWidth = window.innerWidth;
-        let currentChunkSizeArray = chunkSizesSmall; 
-        if (windowInnerWidth > 1200) {
-            currentChunkSizeArray = chunkSizesLarge;
-        } else if (windowInnerWidth > 800) {
-            currentChunkSizeArray = chunkSizesMedium;
-        }
-        maxChunkSize = currentChunkSizeArray[currentChunkSizeArray.length-1];
-        
-        if (increaseChunkSize != null) {
-            let index = currentChunkSizeArray.findIndex(x => x == chunkSize);
-            // If index not found, reset to first element in currentChunkSizeArray
-            if (index == null)
-            {
-                index = 0;
-            }
-            if (increaseChunkSize && index < currentChunkSizeArray.length - 1) {
-                index += 1;
-            } else if (!increaseChunkSize && index > 0) {
-                index -= 1;
-            }
-            chunkSize = currentChunkSizeArray[index];
-            setCookie('mphotos-zoomLevel', chunkSize.toString());
-        }
-        chunkedPhotos = chunkPhotos(filteredPhotosMetadata, chunkSize);
-
+    // Set chunked photos array with current chunk size and calculates row heights
+    // To be run when photo contents, width or height are changed or zoom level is changed
+    const setChunkedPhotos = () => {
+        chunkedPhotos = chunkArray(filteredPhotosMetadata, chunkSize);
         calcRowHeights(showSquareThumbs);
     }
 
+    // Update max chunk size based on window width
+    // To be run when window is resized, orientation changed or zooming in/out
+    const updateMaxChunkSize = () => {
+        maxChunkSize = window.innerWidth > 1200 ? 12 : (window.innerWidth > 800 ? 9 : 7);
+    }
+
+    // Sets new zoom level and updates chunked photos
+    const zoomIn = () => {
+        updateMaxChunkSize();
+        if (chunkSize - minChunkSize > 0) {
+            chunkSize -= 2;
+            setCookie('mphotos-zoomLevel', chunkSize.toString());
+            setChunkedPhotos();
+        }
+    }
+    
+    // Sets new zoom level and updates chunked photos
+    const zoomOut = () => {
+        updateMaxChunkSize();
+        if (chunkSize < maxChunkSize) {
+            chunkSize += 2;
+            setCookie('mphotos-zoomLevel', chunkSize.toString());
+            setChunkedPhotos();
+        }
+    }
+
+    // Calculate row heights based on current chunk size, window width and thumbnail proportions
     const calcRowHeights = (useSquareThumbs: boolean = false) => {
+        updateMaxChunkSize();
         rowHeights = [];
         const windowInnerWidth = window.innerWidth;
         const maxImgWidth = windowInnerWidth / chunkSize;
@@ -199,7 +203,7 @@
         for (let i = 0; i < chunkedPhotos.length; ++i) {
             const chunk = chunkedPhotos[i];
             
-            // Original thumb size is 225x300px
+            // Default thumb size is 225x300px
             let maxHeight = 0;
             // Calculate minimum aspect ratio for current row/chunk
             for (let n = 0; n < chunk.length; ++n) {
@@ -216,24 +220,29 @@
         virtualList.recomputeSizes(0);
     }
 
+    // Opens photo modal
     const openModal = (photo: PhotoMetaClient, index: number) => {
         currentPhoto = photo;
         currentPhotoIndex = index;
         photoModalIsOpen = true;
     }
 
+    // Handles touch start event
     const handleTouchStart = () => {
         isFingerDown = true;
     }
 
+    // Handles touch end event
     const handleTouchEnd = () => {
         isFingerDown = false;
     }
 
+    // Handles closing the photo slider modal
     const handleClosePhotoSlider = () => {
         photoModalIsOpen = false;
     }
 
+    // Handles closing all modals
     const handleCloseAllModals = () => {
         if (isFingerDown && closeAllModalsFromParent == false) {
             closeAllModalsFromParent = true;
@@ -246,6 +255,7 @@
         }
     }
 
+    // Handles list item updates (for scroll position, setting datepicker index)
     const handleListItemUpdate = (e: ItemsUpdatedEvent) => {
         const { start, end } = e.detail;
         const middlePhotoRow = start + Math.floor((end - start) / 2);
@@ -265,16 +275,16 @@
         return `${m}:${s.toString().padStart(2, '0')}`;
     }
 
+    // Toggles video filter on/off
     const toggleVideosCallback = () => {
         toggleShowOnlyVideos = !toggleShowOnlyVideos;
-        console.log("Toggling video filter, now:", toggleShowOnlyVideos);
         setCookie('mphotos-filterOnlyVideos', toggleShowOnlyVideos.toString());
         if (toggleShowOnlyVideos) {
             filteredPhotosMetadata = onlyVideosMetadata;
         } else {
             filteredPhotosMetadata = photosAndVideosMetadata;
         }
-        reChunk();
+        setChunkedPhotos();
     }
 </script>
 
@@ -285,15 +295,16 @@
     photos={filteredPhotosMetadata}
     currentChunkSize={chunkSize}
     maxChunkSize={maxChunkSize}
+    minChunkSize={minChunkSize}
     sortedPhotosCallback={(sortedPhotos) => {
         filteredPhotosMetadata = sortedPhotos;
-        reChunk();
+        setChunkedPhotos();
     }}
     zoomInCallback={() => {
-        reChunk(false);
+        zoomIn();
     }}
     zoomOutCallback={() => {
-        reChunk(true);
+        zoomOut();
     }}
     toggleVideosCallback={() => {
         toggleVideosCallback();

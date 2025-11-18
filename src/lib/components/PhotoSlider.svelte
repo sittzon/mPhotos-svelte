@@ -387,6 +387,7 @@
       photos={photos}
       currentIndex={currentIndex}
       visibleRange={4}
+      closingSlide={closeOnTouchEnd}
       on:select={(e) => currentIndex = e.detail.index}
     />
   {/if}
@@ -524,7 +525,6 @@
   }
 
   .date {
-      box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.9);
       position: fixed; 
       z-index: 20; 
       height: 25px;

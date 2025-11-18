@@ -4,8 +4,9 @@
     import { cubicOut } from 'svelte/easing';
 
     export let photos: Array<PhotoMetaClient> = [];
-    export let currentChunkSize: number = 3;
-    export let maxChunkSize: number = 7;
+    export let currentChunkSize: number = 5;
+    export let minChunkSize: number = 3;
+    export let maxChunkSize: number = 12;
     export let sortedPhotosCallback: (photos: PhotoMetaClient[]) => void = () => {};
     export let zoomInCallback: () => void = () => {};
     export let zoomOutCallback: () => void = () => {};
@@ -17,14 +18,15 @@
 
     let isModalOpen: boolean = false;
     let isSortedByLatest: boolean = true;
-    $: isMaxChunkSize = maxChunkSize == currentChunkSize;
+    $: isMaxChunkSize = currentChunkSize >= maxChunkSize;
+    $: isMinChunkSize = currentChunkSize <= minChunkSize;
     
     $: if (closeFromParent) {
         isModalOpen = false;
     }
 
     $: options = [
-        {id: 0, displayName: 'Zoom in', func: () => {zoomInCallback()}, icon: 'zoom-in', disabled: currentChunkSize == 3},
+        {id: 0, displayName: 'Zoom in', func: () => {zoomInCallback()}, icon: 'zoom-in', disabled: isMinChunkSize},
         {id: 1, displayName: 'Zoom out', func: () => {zoomOutCallback()}, icon: 'zoom-out', disabled: isMaxChunkSize},
         {id: 2, displayName: 'Newest first', func: () => {sort(true)}, icon: 'sort-latest', disabled: isSortedByLatest},
         {id: 3, displayName: 'Oldest first', func: () => {sort(false)}, icon: 'sort-earliest', disabled: !isSortedByLatest},
