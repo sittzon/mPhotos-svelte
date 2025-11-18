@@ -243,7 +243,7 @@
       }
       // Drag up to show info
       if (!changingSlide && Math.abs(diffY) > amountOfPixelsToActivateFade && diffY > amountOfPixelsToActivateFade) {
-        diffX = 0;
+        closingSlide = true;
         if (!hasSwitchedDetailsInfo) {
           isDetailsShown = !isDetailsShown;
           hasSwitchedDetailsInfo = true;
