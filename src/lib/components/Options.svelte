@@ -1,13 +1,13 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { type PhotoMetaClient } from "$api";
+    import type { PhotoModel } from "$api";
     import { cubicOut } from 'svelte/easing';
 
-    export let photos: Array<PhotoMetaClient> = [];
+    export let photos: Array<PhotoModel> = [];
     export let currentChunkSize: number = 5;
     export let minChunkSize: number = 3;
     export let maxChunkSize: number = 12;
-    export let sortedPhotosCallback: (photos: PhotoMetaClient[]) => void = () => {};
+    export let sortedPhotosCallback: (photos: PhotoModel[]) => void = () => {};
     export let zoomInCallback: () => void = () => {};
     export let zoomOutCallback: () => void = () => {};
     export let toggleVideosCallback: () => void = () => {};

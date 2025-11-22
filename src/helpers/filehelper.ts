@@ -1,13 +1,13 @@
 import path from 'path';
 import fs from 'fs/promises';
-import type { PhotoMeta } from '$helpers/interfaces';
+import type { PhotoServerModel } from '$api';
 import { memoryCache } from '$helpers/memorycache';
 
 export const photosMetaCacheKey = 'photosMeta';
 
 // Map GUID to original file location
 export function guidToLocation(guid: string): string | null {
-    const photos: PhotoMeta[] = memoryCache[photosMetaCacheKey] || [];
+    const photos: PhotoServerModel[] = memoryCache[photosMetaCacheKey] || [];
     // console.log(photos.find(x => x.guid === guid));
     return photos.find(x => x.guid === guid)?.location ?? null;
 }

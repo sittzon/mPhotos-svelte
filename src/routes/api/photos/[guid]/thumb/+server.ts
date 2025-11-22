@@ -1,9 +1,10 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import fs from 'fs/promises';
 import path from 'path';
-import { config } from '$config';
+// import { config } from '$config';
+import { env } from '$env/dynamic/private'
 
-const thumbsDir = config.GENERATED_THUMBNAILS || '/thumbs';
+const thumbsDir = env.GENERATED_THUMBNAILS || '/thumbs';
 
 export const GET: RequestHandler = async ({ params }) => {
     const guid = params.guid as string;

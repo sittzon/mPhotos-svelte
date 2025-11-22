@@ -1,20 +1,20 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import { type PhotoMetaClient } from "$api";
+    import type { PhotoModel, PhotoModelExtended } from "$api";
 	import VirtualList from 'svelte-tiny-virtual-list';
 	import ItemsUpdatedEvent from 'svelte-tiny-virtual-list';
     import PhotoSlider from '$components/PhotoSlider.svelte';
     import DatePicker from '$components/DatePicker.svelte';
     import Options from "$components/Options.svelte";
-    import type { PhotoMeta } from "$helpers/interfaces";
 
     let virtualList: VirtualList;
-    let originalPhotosMetadata : Array<PhotoMetaClient> = [];
-    let filteredPhotosMetadata : Array<PhotoMetaClient> = [];
-    let onlyVideosMetadata : Array<PhotoMetaClient> = [];
-    let photosAndVideosMetadata : Array<PhotoMetaClient> = [];
-    let chunkedPhotos : Array<Array<PhotoMetaClient>> = [];
-    let currentPhoto: PhotoMetaClient;
+    let originalPhotosMetadata : Array<PhotoModel> = [];
+    let originalPhotosMetadataExtended : Array<PhotoModelExtended> = [];
+    let filteredPhotosMetadata : Array<PhotoModelExtended> = [];
+    let onlyVideosMetadata : Array<PhotoModelExtended> = [];
+    let photosAndVideosMetadata : Array<PhotoModelExtended> = [];
+    let chunkedPhotos : Array<Array<PhotoModelExtended>> = [];
+    let currentPhoto: PhotoModelExtended;
     let datepickerIndex: number = 0;
     let currentPhotoIndex: number = 0;
     let rowHeights: Array<number> = [];
@@ -67,23 +67,23 @@
         .then((data) => {
             originalPhotosMetadata = data;
             
-            // Add {thumb, medium, full} information for PhotoSlider to use
-            // This information is not present during transfer to minimize data size
-            originalPhotosMetadata.forEach(photo => {
-                photo.thumb = "api/photos/" + photo.guid + "/thumb";
-                photo.medium = "api/photos/" + photo.guid + "/medium";
-                photo.full = "api/photos/" + photo.guid;
-                photo.video = "api/video/" + photo.guid;
-            });
+            // Map to PhotoModelExtended
+            originalPhotosMetadataExtended = originalPhotosMetadata.map((photo: PhotoModel) => ({
+                ...photo,
+                thumb: `api/photos/${photo.guid}/thumb`,
+                medium: `api/photos/${photo.guid}/medium`,
+                full: `api/photos/${photo.guid}`,
+                video: `api/video/${photo.guid}`
+            }));
             
             // Originally filter out live-photo-videos 
-            photosAndVideosMetadata = originalPhotosMetadata
-                .filter((photo: PhotoMetaClient) => photo.type != 'live-photo-video');
+            photosAndVideosMetadata = originalPhotosMetadataExtended
+                .filter((photo: PhotoModelExtended) => photo.type != 'live-photo-video');
             onlyVideosMetadata = photosAndVideosMetadata
-                .filter((photo: PhotoMetaClient) => photo.type == 'video');
+                .filter((photo: PhotoModelExtended) => photo.type == 'video');
             filteredPhotosMetadata = photosAndVideosMetadata
             if (toggleShowOnlyVideos) {
-                filteredPhotosMetadata = filteredPhotosMetadata.filter((photo: PhotoMetaClient) => photo.type == 'video');
+                filteredPhotosMetadata = filteredPhotosMetadata.filter((photo: PhotoModelExtended) => photo.type == 'video');
             }
             if (filteredPhotosMetadata.length > 0) {
                 setChunkedPhotos();
@@ -106,9 +106,9 @@
         ['click', 'touchstart', 'mousemove'].forEach(event => {
             document.addEventListener(event, () => {
                 const els = document.getElementsByClassName('fadeout');
-                Array.from(els).forEach(el => {
-                    el.style.opacity = '1';  // instantly show
-                    resetFade(el);             // restart fade timer
+                Array.from(els).forEach((el: HTMLElement) => {
+                    el.style.opacity = '1';     // instantly show
+                    resetClass(el, 'fadeout');  // restart fade timer
                 });
             });
         });
@@ -136,11 +136,11 @@
     }
 
     // Resets fadeout animation on element
-    const resetFade = (el: HTMLElement) => {
+    const resetClass = (el: HTMLElement, className: string) => {
         // Reset the animation by removing and re-adding the class
-        el.classList.remove('fadeout');
+        el.classList.remove(className);
         void el.offsetWidth; // forces reflow so the animation can restart
-        el.classList.add('fadeout');
+        el.classList.add(className);
     }
 
     // Split any array into groups of n size
@@ -221,7 +221,7 @@
     }
 
     // Opens photo modal
-    const openModal = (photo: PhotoMetaClient, index: number) => {
+    const openModal = (photo: PhotoModelExtended, index: number) => {
         currentPhoto = photo;
         currentPhotoIndex = index;
         photoModalIsOpen = true;
@@ -352,47 +352,52 @@
 
     <div slot="item" let:index let:style {style}>
         <table style="width: 100%; table-layout: fixed;">
-            <tr style="text-align:center;">
-            {#each chunkedPhotos[index] as currentPhotoMeta, itemIndex}
-                <td style="">
-                    <a on:click={() => openModal(currentPhotoMeta, index*chunkSize + itemIndex)} href='/'>
-                        <div style="position: relative; display: inline-block;">
-                            <img 
-                                id={currentPhotoMeta.guid}
-                                src="api/photos/{currentPhotoMeta.guid}/thumb"
-                                alt={currentPhotoMeta.dateTaken}
-                                style={showSquareThumbs
-                                    ? `height: ${rowHeights[index]-2}px; width: ${rowHeights[index]-2}px; object-fit: cover;`
-                                    : `max-height: ${rowHeights[index]-2}px;`}
-                            >
-                            {#if currentPhotoMeta.type === 'video' || currentPhotoMeta.type === 'live-photo-video'}
-                                {#if currentPhotoMeta.lengthSeconds}
-                                    <span class="video-duration-overlay">
-                                        {formatDuration(currentPhotoMeta.lengthSeconds)}
-                                    </span>
-                                {/if}
-                            {/if}
-                        </div>
-                    </a>
-                </td>
-            {/each}
-            </tr>
+            <tbody>
+                <tr style="text-align:center;">
+                    {#each chunkedPhotos[index] as currentPhotoMeta, itemIndex}
+                        <td style="">
+                            <a on:click={() => openModal(currentPhotoMeta, index*chunkSize + itemIndex)} href='/'>
+                                <div style="position: relative; display: inline-block;">
+                                    <img 
+                                    id={currentPhotoMeta.guid}
+                                    src="api/photos/{currentPhotoMeta.guid}/thumb"
+                                    alt={currentPhotoMeta.dateTaken}
+                                    style={showSquareThumbs
+                                        ? `height: ${rowHeights[index]-2}px; width: ${rowHeights[index]-2}px; object-fit: cover;`
+                                        : `max-height: ${rowHeights[index]-2}px;`}
+                                    >
+                                    {#if currentPhotoMeta.type === 'video' || currentPhotoMeta.type === 'live-photo-video'}
+                                        {#if currentPhotoMeta.lengthSeconds}
+                                        <span class="video-duration-overlay">
+                                            {formatDuration(currentPhotoMeta.lengthSeconds)}
+                                        </span>
+                                        {/if}
+                                    {/if}
+                                </div>
+                            </a>
+                        </td>
+                    {/each}
+                </tr>
+            </tbody>
         </table>
     </div>
 
     </VirtualList>
 </div>
 
-<!-- <div class="bottom-bar">
+<div class="bottom-bar">
     <div>
         <div>
             <button id="library-button" class="interface"></button>
         </div>
         <div>
+            <button id="favorites-button" class="interface"></button>
+        </div>
+        <div>
             <button id="deleted-button" class="interface"></button>
         </div>
     </div>
-</div> -->
+</div>
 
 <style>
     #virtual-list-container {
@@ -478,7 +483,7 @@
         border-radius: 12px;
         height: 48px;
         width: 48px;
-        margin: 0 10px 0 10px;
+        margin: 0 15px 0 15px;
     }
     
     .bottom-bar div button {
@@ -490,6 +495,11 @@
 
     #library-button {
         background: url('/library.svg') no-repeat center;
+        background-size: contain;
+    }
+
+    #favorites-button {
+        background: url('/favorite.svg') no-repeat center;
         background-size: contain;
     }
 

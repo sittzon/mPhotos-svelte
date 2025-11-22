@@ -4,20 +4,20 @@ mPhotos makes your local photo collection available as a lightning fast virtual 
 ## Installation
 ### Docker
 Map your originals and thumbnails directories in docker-compose.yml under **volumes:** and then run:
-`docker-compose up -d`
+- `docker-compose up -d`
 
 ### Local
-Specify your originals directory and where you would like your thumbnails to be created in **config.ts**.
-- ORIGINAL_PHOTOS - Originals directory, defaults to '/originals'
-- GENERATED_THUMBNAILS - Thumbnail directory, defaults to '/thumbs' (will be created recursively if not present)
+Specify your originals directory and where you would like your thumbnails to be created in a new file **.env**.
+- *ORIGINAL_PHOTOS* - Originals directory (string), defaults to '/originals'
+- *GENERATED_THUMBNAILS* - Thumbnail directory (string), defaults to '/thumbs' (will be created recursively if not present)
 
-*Optional:* Use THUMBNAIL_SIZE and MEDIUM_SIZE variables to tweak size of thumbnails and images used in PhotoSlider. The METADATA_FILE and ERRORS_FILE can also be specified, defaults to 'metadata.json' and 'errors.log';
+*Optional:* Use *THUMBNAIL_SIZE and *MEDIUM_SIZE* (int) variables to tweak size of thumbnails and images used in PhotoSlider. The *METADATA_FILE* and *ERRORS_FILE* (string) can also be specified, defaults to 'metadata.json' and 'errors.log';
 
 - `npm install`
 - `npm run host`
 
 ## Development
-Define variables in **config.ts** and then run:
+Define variables in **.env** and then run:
 - `npm install`
 - `npm run dev`
 

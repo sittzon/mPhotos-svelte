@@ -1,10 +1,10 @@
 <script lang="ts">
   import { onMount, onDestroy  } from "svelte";
-  import { type PhotoMetaClient } from "$api";
+  import type { PhotoModelExtended }from "$api";
   import ThumbnailStrip from '$components/ThumbnailStrip.svelte';
   import { slide } from 'svelte/transition';
 
-  export let photos: Array<PhotoMetaClient> = [];
+  export let photos: Array<PhotoModelExtended> = [];
   export let closeModal = () => {}; // Feedback close to parent
   export let photoIndex: number = 0; // Start index in photos array
   export let nrToPreload: number = 1; // Number of photos to preload on each side
@@ -110,7 +110,7 @@
     }
   }
   
-  const getDateFormattedLong = (photo: PhotoMetaClient) => {
+  const getDateFormattedLong = (photo: PhotoModelExtended) => {
     if (photo == null || photo.dateTaken == null) {
       return "";
     }
@@ -314,7 +314,10 @@
   };
 
     // Format seconds as mm:ss
-  function formatDuration(seconds: number): string {
+  function formatDuration(seconds: number | null): string {
+      if (seconds === null) {
+          return "0:00";
+      }
       const m = Math.floor(seconds / 60);
       const s = Math.floor(seconds % 60);
       return `${m}:${s.toString().padStart(2, '0')}`;

@@ -1,11 +1,10 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { type PhotoMetaClient } from "$api";
-    import { fade, slide } from 'svelte/transition';
+    import type { PhotoModel }from "$api";
     import { createEventDispatcher } from 'svelte';
     import { cubicOut } from 'svelte/easing';
 
-    export let photos: Array<PhotoMetaClient> = [];
+    export let photos: Array<PhotoModel> = [];
     export let photoIndex: number = 0;
     export let chunkSize: number = 3;
     export let closeFromParent: boolean = false;
@@ -39,7 +38,7 @@
         }
     }
 
-    const getDateFormattedShort = (photo: PhotoMetaClient) => {
+    const getDateFormattedShort = (photo: PhotoModel) => {
         if (photo == null || photo.dateTaken == null) {
             return "";
         }

@@ -1,18 +1,19 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import fs from 'fs/promises';
 import path from 'path';
-import { config } from '$config';
-import type { PhotoMeta, PhotoMetaClient } from '$helpers/interfaces';
+// import { config } from '$config';
+import { env } from '$env/dynamic/private'
+import type { PhotoServerModel, PhotoModel } from '$api';
 import { getImageDimensions, getVideoDimensions, getVideoDuration, generateVideoThumbnail, shutdownExifTool, getHashString, generateThumbnailBytes, getDateTakenFromPath } from '$helpers/imagehelper';
 import { getFileInfosRecursively, photosMetaCacheKey } from '$helpers/filehelper';
 import { memoryCache } from '$helpers/memorycache';
 
-const originalsDir = config.ORIGINAL_PHOTOS || '/originals';
-const thumbsDir = config.GENERATED_THUMBNAILS || '/thumbs';
-const metaDataFilename = path.join(thumbsDir, config.METADATA_FILE || 'metadata.json');
-const errorLogFilename = path.join(thumbsDir, config.ERRORS_FILE || 'errors.log');
-const thumbnailSizeWidth = config.THUMBNAIL_SIZE || 300;
-const mediumSizeWidth = config.MEDIUM_SIZE || 1200;
+const originalsDir = env.ORIGINAL_PHOTOS || '/originals';
+const thumbsDir = env.GENERATED_THUMBNAILS || '/thumbs';
+const metaDataFilename = path.join(thumbsDir, env.METADATA_FILE || 'metadata.json');
+const errorLogFilename = path.join(thumbsDir, env.ERRORS_FILE || 'errors.log');
+const thumbnailSizeWidth = env.THUMBNAIL_SIZE || 300;
+const mediumSizeWidth = env.MEDIUM_SIZE || 1200;
 const videoExts = ['.mp4', '.mov'];
 const imageExts = ['.jpg', '.jpeg', '.heic', '.heif', '.png'];
 
@@ -23,7 +24,7 @@ async function loadPhotos() {
         try {
             await fs.stat(originalsDir);
         } catch {
-            console.error('Original photos directory does not exist');
+            console.error('Original photos directory ' + originalsDir + ' does not exist');
             return;
         }
 
@@ -41,7 +42,7 @@ async function loadPhotos() {
             || videoExts.includes(x.Extension.toLowerCase())
         );
 
-        let photoMetadata: PhotoMeta[] = [];
+        let photoMetadata: PhotoServerModel[] = [];
         try {
             // Check if metadata file exists and only index new photos not found in metadata file
             const metaExists = await fs.stat(metaDataFilename).then(() => true).catch(() => false);
@@ -90,7 +91,7 @@ async function loadPhotos() {
                     dateTaken = await getDateTakenFromPath(fileInfo.FullName) as string;
                 }
                 // const dateTaken = await getDateTaken(bytes) as string;
-                const photoMeta: PhotoMeta = {
+                const photoMeta: PhotoServerModel = {
                     dateTaken: dateTaken,
                     guid: getHashString(fileInfo.FullName),
                     location: fileInfo.FullName,
@@ -151,11 +152,11 @@ async function loadPhotos() {
     }
 }
 
-// GET /api/photos/metadata
+// GET /api/metadata
 export const GET: RequestHandler = async ({ url }) => {
     await loadPhotos();
-    const photos: PhotoMeta[] = memoryCache[photosMetaCacheKey] || [];
-    const result: PhotoMetaClient[] = photos.map(x => ({
+    const photos: PhotoServerModel[] = memoryCache[photosMetaCacheKey] || [];
+    const result: PhotoModel[] = photos.map(x => ({
         dateTaken: x.dateTaken,
         guid: x.guid,
         name: x.name,
