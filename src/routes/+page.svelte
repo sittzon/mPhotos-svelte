@@ -36,6 +36,11 @@
 
     onMount(async () =>
     {
+        // Dark/Light mode based on system preference
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const v = document.getElementById('virtual-list-container') as HTMLElement;
+        v.classList.toggle("bg-black", prefersDark);
+
         windowHeight = window.innerHeight;
 
         // Read and set options from cookies
@@ -400,10 +405,15 @@
 </div>
 
 <style>
+    .bg-black {
+        background-color: #121212;
+        color: #e0e0e0;
+    }
+
     #virtual-list-container {
         overflow-x: hidden;
         touch-action: pan-y;
-        background-color: black;
+        /* background-color: black; */
         z-index: -1;
         position: fixed;
         top: 0;

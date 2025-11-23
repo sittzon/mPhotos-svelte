@@ -1,8 +1,7 @@
 import sharp from 'sharp';
 import { spawn } from 'child_process';
 import crypto from 'crypto';
-import heicConvert from "heic-convert";
-// import fs from 'fs/promises';
+import fs from 'fs/promises';
 import { ExifTool } from "exiftool-vendored";
 import os from "os";
 
@@ -56,7 +55,6 @@ export async function getImageDimensions(input: Buffer | string, extension?: str
     if (buffer) {
         imgBuffer = buffer;
     } else if (filePath) {
-        const fs = await import('fs/promises');
         imgBuffer = await fs.readFile(filePath);
     } else {
         throw new Error('No buffer or file path provided for image dimension extraction');
@@ -210,25 +208,16 @@ export function getHashString(str: string): string {
 }
 
 // Resize and save as webp
-export async function generateThumbnailBytes(image: Buffer, w: number, h: number, outPath: string, quality = 80, isHeic: boolean = false): Promise<void> {
-    let a: sharp.Sharp;
-    if (isHeic) {
-        const outputBuffer = await heicConvert({
-            buffer: image,
-            format: "JPEG",
-        });
-        a = await sharp(outputBuffer).rotate(); // Auto-rotate based on EXIF
-    }
-    else {
-        a = await sharp(image)
-            .rotate() // Auto-rotate based on EXIF
-    }
-
-    var b = a
+export async function generateThumbnailBytes(imagePath: string, w: number, h: number, outPath: string, quality = 80, isHeic: boolean = false): Promise<void>
+{
+    // const imageBuffer = await fs.readFile(imagePath);
+    const sharpImage = await sharp(imagePath)
+        .rotate() // Auto-rotate based on EXIF
         .resize(w, h, { fit: 'inside' })
-        .webp({ quality })
+        .webp({ quality });
+
     try {
-        await b.toFile(outPath);
+        await sharpImage.toFile(outPath);
     } catch (e) {
         console.log('Error saving image:', e);
     }

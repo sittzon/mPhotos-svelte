@@ -116,7 +116,7 @@ async function loadPhotos() {
                     if (isVideo) {
                         await generateVideoThumbnail(fileInfo.FullName, thumbPath, w, h);
                     } else {
-                        await generateThumbnailBytes(bytes, w, h, thumbPath, 80, isHeic);
+                        await generateThumbnailBytes(fileInfo.FullName, w, h, thumbPath, 80, isHeic);
                     }
                 }
                 
@@ -129,7 +129,7 @@ async function loadPhotos() {
                     if (isVideo) {
                         await generateVideoThumbnail(fileInfo.FullName, mediumPath, mediumSizeWidthMin, mediumSizeHeight, 1);
                     } else {
-                        await generateThumbnailBytes(bytes, mediumSizeWidthMin, mediumSizeHeight, mediumPath, 99, isHeic);
+                        await generateThumbnailBytes(fileInfo.FullName, mediumSizeWidthMin, mediumSizeHeight, mediumPath, 99, isHeic);
                     }
                 }
                 

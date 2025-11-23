@@ -7,6 +7,7 @@ COPY /package.json .
 COPY /package-lock.json .
 
 COPY /src/ ./src
+COPY /.env.docker ./
 COPY /static/ ./static
 COPY /svelte.config.js .
 COPY /tsconfig.json .
@@ -15,6 +16,6 @@ COPY /vite.config.ts .
 RUN npm ci
 RUN npm run build
 
-EXPOSE 5174
+EXPOSE 3000
 
-CMD ["npm", "run", "host"]
+CMD ["node", "--env-file=.env.docker", "/app/build"]
