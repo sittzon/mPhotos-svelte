@@ -18,8 +18,5 @@ export interface PhotoModelExtended extends PhotoModel {
     medium: string;
     full: string;
     video: string;
-}
-
-export interface Favorite {
-    guid: string;
+    isFavorite: boolean | null;
 }

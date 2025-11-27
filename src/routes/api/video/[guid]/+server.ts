@@ -1,5 +1,4 @@
 import type { RequestHandler } from '@sveltejs/kit';
-// import fs from 'fs/promises';
 import { guidToLocation } from '$helpers/filehelper';
 import fs from 'fs';
 import path from 'path';

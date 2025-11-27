@@ -1,13 +1,14 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import type { PhotoModel } from "$api";
+    import type { PhotoModel, PhotoModelExtended } from "$api";
+    import FilterOptions from './FilterOptions.svelte';
     import { cubicOut } from 'svelte/easing';
 
     export let photos: Array<PhotoModel> = [];
     export let currentChunkSize: number = 5;
     export let minChunkSize: number = 3;
     export let maxChunkSize: number = 12;
-    export let sortedPhotosCallback: (photos: PhotoModel[]) => void = () => {};
+    export let sortedPhotosCallback: (photos: PhotoModelExtended[]) => void = () => {};
     export let zoomInCallback: () => void = () => {};
     export let zoomOutCallback: () => void = () => {};
     export let toggleVideosCallback: () => void = () => {};
@@ -16,6 +17,7 @@
     export let closeFromParent: boolean = false;
     export let arePhotosSquare: boolean = false;
 
+    let isFilterOptionsOpen: boolean = false;
     let isModalOpen: boolean = false;
     let isSortedByLatest: boolean = true;
     $: isMaxChunkSize = currentChunkSize >= maxChunkSize;
@@ -23,6 +25,22 @@
     
     $: if (closeFromParent) {
         isModalOpen = false;
+        isFilterOptionsOpen = false;
+    }
+
+    const toggleOpenFilterOptions = () => {
+        // Emit custom event to FilterOptions
+        isFilterOptionsOpen = !isFilterOptionsOpen;
+        if (isFilterOptionsOpen) {
+            // Main options modal make darker when filter options open
+            // document.getElementById('options')?.style.setProperty('opacity', '0.8');
+        }
+        console.log("Toggling filter options from Options.svelte");
+        const event = new CustomEvent('toggleOpenFilterOptions', {
+            detail: { isOpen: isFilterOptionsOpen }
+        });
+        // const event = new CustomEvent('toggleOpenFilterOptions');
+        dispatchEvent(event);
     }
 
     $: options = [
@@ -32,6 +50,7 @@
         {id: 3, displayName: 'Oldest first', func: () => {sort(false)}, icon: 'sort-earliest', disabled: !isSortedByLatest},
         {id: 4, displayName: isVideoFiltered? 'Include all' : 'Only videos', func: () => {toggleVideosCallback()}, icon: isVideoFiltered ? 'video-off' : 'video'},
         {id: 5, displayName: arePhotosSquare? 'Maintain proportions' : 'Square proportions', func: () => {toggleSquareProportionsCallback()}, icon: 'aspect-ratio'},
+        {id: 6, displayName: 'Filter', func: () => {toggleOpenFilterOptions()}, icon: 'aspect-ratio'},
     ]
 
     onMount(() => {
@@ -45,9 +64,11 @@
         }
         else if (target.closest('#options')) {
             isModalOpen = !isModalOpen;
-        } else {
-            isModalOpen = false;
-        }
+        } 
+        // else {
+        //     isModalOpen = false;
+        //     isFilterOptionsOpen = false;
+        // }
     }
 
     const sort = (latestFirst = true) => {
@@ -124,6 +145,12 @@
         </ul>
     {/if}
 </button>
+
+{#if isFilterOptionsOpen}
+    <div transition:slideAndResizeSequential={{duration: 300}}>
+        <FilterOptions />
+    </div>
+{/if}
 
 <style>
     #options {

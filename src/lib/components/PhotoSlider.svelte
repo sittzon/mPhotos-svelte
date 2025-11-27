@@ -108,6 +108,9 @@
     if (key.code=='KeyI') {
       isDetailsShown = !isDetailsShown;
     }
+    if (key.code=='KeyF') {
+      setCurrentAsFavorite();
+    }
   }
   
   const getDateFormattedLong = (photo: PhotoModelExtended) => {
@@ -322,6 +325,30 @@
       const s = Math.floor(seconds % 60);
       return `${m}:${s.toString().padStart(2, '0')}`;
   }
+
+  const setCurrentAsFavorite = async () => {
+    const currentPhoto = photos[currentIndex];
+    photos[currentIndex].isFavorite = !photos[currentIndex].isFavorite;
+
+    await fetch("/api/favorites/" + currentPhoto.guid, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        guid: currentPhoto.guid
+      }),
+    })
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error("Failed to toggle favorite status");
+      }
+    })
+
+    // Dispatch update favorites event to parent
+    const event = new CustomEvent('updateFavorites');
+    dispatchEvent(event);
+  }
 </script>
 
 <div id="slider" on:touchstart={onTouchStart} on:touchmove={onTouchMove} on:touchend={onTouchEnd} role="navigation">
@@ -366,6 +393,12 @@
               </span>
             </div>
           {/if}
+          <div>
+            <button 
+              class="{photos[currentIndex].isFavorite ? 'favorite-icon-checked' : 'favorite-icon-unchecked'} fadeout" 
+              on:click={() => setCurrentAsFavorite()}
+            />
+          </div>
         {/if}
       {/each}
     </div>
@@ -385,7 +418,7 @@
       </div>
     </div>
   {/if}
-  {#if scale <= 1 && !isVideoPlaying}
+  <!-- {#if scale <= 1 && !isVideoPlaying}
     <ThumbnailStrip
       photos={photos}
       currentIndex={currentIndex}
@@ -393,7 +426,7 @@
       closingSlide={closeOnTouchEnd}
       on:select={(e) => currentIndex = e.detail.index}
     />
-  {/if}
+  {/if} -->
 </div>
 
 
@@ -571,5 +604,35 @@
     display: flex;
     justify-content: space-between;
     line-height: 0.8;
+  }
+  
+  .favorite-icon-checked {
+    position: fixed;
+    bottom: 10px;
+    left: 50%;
+    right: 50%;
+    width: 40px;
+    height: 40px;
+    transform: translateX(-50%);
+    background-color: white;
+    z-index: 20;
+    mask: url('/favorite-checked.svg') no-repeat center;
+    background-size: contain;
+    border: none;
+  }
+  
+  .favorite-icon-unchecked {
+    position: fixed;
+    bottom: 10px;
+    left: 50%;
+    right: 50%;
+    width: 40px;
+    height: 40px;
+    transform: translateX(-50%);
+    background-color: white;
+    z-index: 20;
+    mask: url('/favorite-unchecked.svg') no-repeat center; 
+    background-size: contain;
+    border: none;
   }
 </style>
