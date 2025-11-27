@@ -107,7 +107,22 @@ async function loadPhotos() {
 
                 // Only generate thumbnail if not found on disk
                 const isHeic = fileInfo.Extension.toLowerCase() === '.heic' || fileInfo.Extension.toLowerCase() === '.heif';
-                const thumbPath = path.join(thumbsDir, photoMeta.guid + '.webp');
+                // Split output path into several subfolders, two levels deep, based on first 4 characters of GUID
+                const dirLevel1 = path.join(thumbsDir, photoMeta.guid.substring(0, 2));
+                const dirLevel2 = path.join(dirLevel1, photoMeta.guid.substring(2, 4));
+                try {
+                    await fs.stat(dirLevel1);
+                } catch {
+                    await fs.mkdir(dirLevel1);
+                }
+                try {
+                    await fs.stat(dirLevel2);
+                } catch {
+                    await fs.mkdir(dirLevel2);
+                }
+
+                // Generate thumbnail
+                const thumbPath = path.join(thumbsDir, photoMeta.guid.substring(0, 2), photoMeta.guid.substring(2, 4), photoMeta.guid + '.webp');
                 const thumbFileExists = await fs.stat(thumbPath).then(() => true).catch(() => false);
                 if (!thumbFileExists) {
                     const aspectRatio = photoMeta.width / photoMeta.height;
@@ -121,7 +136,7 @@ async function loadPhotos() {
                 }
                 
                 // Do same for medium size
-                const mediumPath = path.join(thumbsDir, photoMeta.guid + '-medium.webp');
+                const mediumPath = path.join(thumbsDir, photoMeta.guid.substring(0, 2), photoMeta.guid.substring(2, 4), photoMeta.guid + '-medium.webp');
                 const mediumFileExists = await fs.stat(mediumPath).then(() => true).catch(() => false);
                 const mediumSizeWidthMin = Math.min(photoMeta.width, mediumSizeWidth); // Don't upscale beyond original width
                 const mediumSizeHeight = Math.floor(photoMeta.height * (mediumSizeWidthMin / photoMeta.width));
