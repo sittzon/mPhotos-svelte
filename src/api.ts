@@ -19,4 +19,5 @@ export interface PhotoModelExtended extends PhotoModel {
     full: string;
     video: string;
     isFavorite: boolean | null;
+    isTrash: boolean | null;
 }

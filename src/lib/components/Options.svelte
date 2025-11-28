@@ -11,9 +11,10 @@
     export let sortedPhotosCallback: (photos: PhotoModelExtended[]) => void = () => {};
     export let zoomInCallback: () => void = () => {};
     export let zoomOutCallback: () => void = () => {};
-    export let toggleVideosCallback: () => void = () => {};
     export let toggleSquareProportionsCallback: () => void = () => {};
     export let isVideoFiltered: boolean = false;
+    export let isFavoriteFiltered: boolean = false;
+    export let isShowingAll: boolean = false;
     export let closeFromParent: boolean = false;
     export let arePhotosSquare: boolean = false;
 
@@ -48,7 +49,6 @@
         {id: 1, displayName: 'Zoom out', func: () => {zoomOutCallback()}, icon: 'zoom-out', disabled: isMaxChunkSize},
         {id: 2, displayName: 'Newest first', func: () => {sort(true)}, icon: 'sort-latest', disabled: isSortedByLatest},
         {id: 3, displayName: 'Oldest first', func: () => {sort(false)}, icon: 'sort-earliest', disabled: !isSortedByLatest},
-        {id: 4, displayName: isVideoFiltered? 'Include all' : 'Only videos', func: () => {toggleVideosCallback()}, icon: isVideoFiltered ? 'video-off' : 'video'},
         {id: 5, displayName: arePhotosSquare? 'Maintain proportions' : 'Square proportions', func: () => {toggleSquareProportionsCallback()}, icon: 'aspect-ratio'},
         {id: 6, displayName: 'Filter', func: () => {toggleOpenFilterOptions()}, icon: 'aspect-ratio'},
     ]
@@ -148,7 +148,11 @@
 
 {#if isFilterOptionsOpen}
     <div transition:slideAndResizeSequential={{duration: 300}}>
-        <FilterOptions />
+        <FilterOptions 
+            isVideoFiltered={isVideoFiltered}
+            isFavoriteFiltered={isFavoriteFiltered}
+            isShowingAll={isShowingAll}
+        />
     </div>
 {/if}
 

@@ -8,51 +8,57 @@
     import Options from "$components/Options.svelte";
 
     let virtualList: VirtualList;
-    let originalPhotosMetadata : Array<PhotoModel> = [];
+    
     let originalPhotosMetadataExtended : Array<PhotoModelExtended> = [];
     let filteredPhotosMetadata : Array<PhotoModelExtended> = [];
-    let onlyVideosMetadata : Array<PhotoModelExtended> = [];
-    let photosAndVideosMetadata : Array<PhotoModelExtended> = [];
+    $: photosAndVideosMetadata = originalPhotosMetadataExtended.filter((photo: PhotoModelExtended) => photo.type != 'live-photo-video');
+    
     let favorites: Array<string> = [];
-    let favoritesPhotosMetadata: Array<PhotoModelExtended> = [];
+    // $: favoritesPhotosMetadata = originalPhotosMetadataExtended.filter((photo: PhotoModelExtended) => favorites.includes(photo.guid));
+    
+    let trash: Array<string> = [];
+    // $: trashPhotosMetadata = originalPhotosMetadataExtended.filter((photo: PhotoModelExtended) => trash.includes(photo.guid));
+    
     let chunkedPhotos : Array<Array<PhotoModelExtended>> = [];
-    let currentPhoto: PhotoModelExtended;
+    let chunkSize: number =  5;
+    let maxChunkSize: number = 12; // Varies based on window width
+    const minChunkSize: number = 3; // No less than 3 columns
+    
     let datepickerIndex: number = 0;
     let currentPhotoIndex: number = 0;
     let rowHeights: Array<number> = [];
-    let chunkSize: number =  5;
-    const minChunkSize: number = 3; // No less than 3 columns
-    let maxChunkSize: number = 12; // Varies based on window width
-    let photoModalIsOpen: boolean = false;
+    
     let windowHeight: number = 1000;
     let scrollToIndex: number | null = null;
     let closeAllModalsFromParent = false;
     let isFingerDown: boolean = false;
-    let toggleShowOnlyVideos: boolean = false;
+    
+    let isPhotoModalOpen: boolean = false;
     let showSquareThumbs: boolean = false; // false = original aspect ratio, true = square
-    let showFavorites: boolean = false;
+    let filterAll: boolean = true;
+    let filterVideos: boolean = false;
+    let filterFavorites: boolean = false;
+    let filterTrash: boolean = false;
 
     const months = [ "January", "February", "March", "April", "May", "June", 
            "July", "August", "September", "October", "November", "December" ];
 
-    $: currentNoPhotos = filteredPhotosMetadata.length || 0;
+    $: currentNoPhotos = filteredPhotosMetadata.length > 0? filteredPhotosMetadata.length : 0;
 
     onMount(async () =>
     {
-        // Dark/Light mode based on system preference
-        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const v = document.getElementById('virtual-list-container') as HTMLElement;
-        v.classList.toggle("bg-black", prefersDark);
-
         windowHeight = window.innerHeight;
 
         // Read and set options from cookies
         const tempChunkSize = getCookie('mphotos-zoomLevel');
         const tempFilterOnlyVideos = getCookie('mphotos-filterOnlyVideos');
+        const tempFilterFavorites = getCookie('mphotos-filterFavorites');
         const tempSquareProportions = getCookie('mphotos-squareProportions');
         const tempScrollToIndex = getCookie('mphotos-scrollToIndex');
         chunkSize = tempChunkSize? +tempChunkSize : chunkSize;
-        toggleShowOnlyVideos = tempFilterOnlyVideos === 'true' ? true : false;
+        filterVideos = tempFilterOnlyVideos === 'true' ? true : false;
+        filterFavorites = tempFilterFavorites === 'true' ? true : false;
+        filterAll = (!filterVideos && !filterFavorites);
         showSquareThumbs = tempSquareProportions === 'true' ? true : false;
 
         // Fetch metadata        
@@ -71,10 +77,8 @@
             }
         })
         .then((data) => {
-            originalPhotosMetadata = data;
-            
             // Map to PhotoModelExtended
-            originalPhotosMetadataExtended = originalPhotosMetadata.map((photo: PhotoModel) => ({
+            originalPhotosMetadataExtended = data.map((photo: PhotoModel) => ({
                 ...photo,
                 thumb: `api/photos/${photo.guid}/thumb`,
                 medium: `api/photos/${photo.guid}/medium`,
@@ -86,10 +90,8 @@
             // Originally filter out live-photo-videos 
             photosAndVideosMetadata = originalPhotosMetadataExtended
                 .filter((photo: PhotoModelExtended) => photo.type != 'live-photo-video');
-            onlyVideosMetadata = photosAndVideosMetadata
-                .filter((photo: PhotoModelExtended) => photo.type == 'video');
             filteredPhotosMetadata = photosAndVideosMetadata
-            if (toggleShowOnlyVideos) {
+            if (filterVideos) {
                 filteredPhotosMetadata = filteredPhotosMetadata.filter((photo: PhotoModelExtended) => photo.type == 'video');
             }
             if (filteredPhotosMetadata.length > 0) {
@@ -104,6 +106,9 @@
         // Fetch favorits
         updateFavorites();
 
+        // Update trash
+        updateTrash();
+
         // Add event listeners
         window.addEventListener("orientationchange", () => calcRowHeights(showSquareThumbs));
         window.addEventListener("resize", () => calcRowHeights(showSquareThumbs));
@@ -112,9 +117,27 @@
         window.addEventListener("touchend", handleTouchEnd);
         window.addEventListener("touchcancel", handleTouchEnd);
         window.addEventListener("updateFavorites", () => updateFavorites());
-        window.addEventListener("toggleVideos", (event) => {console.log("toggleVideos event received: "+event.detail.isVideoFiltered); toggleShowOnlyVideos = event.detail.isVideoFiltered; filterPhotosArray()});
-        window.addEventListener("toggleFavorites", (event) => {console.log("toggleFavorites event received: "+event.detail.isFavoriteFiltered); showFavorites = event.detail.isFavoriteFiltered; filterPhotosArray()});
         window.addEventListener("keyup", keyPressUp);
+        
+        // Events from FilterOptions
+        window.addEventListener("toggleVideos", (event) => {
+            filterVideos = !filterVideos; 
+            filterAll = (!filterVideos && !filterFavorites);
+            setCookie('mphotos-filterOnlyVideos', filterVideos.toString());
+            filterPhotosArray()});
+        window.addEventListener("toggleFavorites", (event) => {
+            filterFavorites = !filterFavorites; 
+            filterAll = (!filterVideos && !filterFavorites);
+            setCookie('mphotos-filterFavorites', filterFavorites.toString());
+            filterPhotosArray()});
+        window.addEventListener("showAll", (event) => {
+            console.log("Show all event received");
+            console.log("Before:", {filterAll, filterFavorites, filterVideos});
+            filterAll = !filterAll; 
+            filterFavorites = filterAll? false : filterFavorites;
+            filterVideos = filterAll? false : filterVideos;
+            filterPhotosArray()});
+            
 
         // Show elements again immediately on user action
         ['click', 'touchstart', 'mousemove'].forEach(event => {
@@ -127,16 +150,11 @@
             });
         });
         
-        // Register service worker
-        // if ('serviceWorker' in navigator) {
-        //     navigator.serviceWorker.register('/service-worker.js')
-        //     .then(registration => {
-        //         console.log('Service Worker registered with scope:', registration.scope);
-        //     })
-        //     .catch(err => {
-        //         console.log('Service Worker registration failed:', err);
-        //     });
-        // }
+        // Dark/Light mode based on system preference
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        // const v = document.getElementById('virtual-list-container') as HTMLElement;
+        const v = document.getElementById('virtual-list-wrapper') as HTMLElement;
+        v.classList.toggle("bg-black", prefersDark);
     });
 
     const keyPressUp = (key: KeyboardEvent) => {
@@ -158,6 +176,7 @@
             if (response.ok) {
                 return response.json();
             } else {
+                // No favorites found
                 console.error("Failed to fetch favorites, status:", response.status);
                 return [];
             }
@@ -170,13 +189,35 @@
                     photo.isFavorite = true;
                 }
             });
-            favoritesPhotosMetadata = originalPhotosMetadataExtended.filter(photo => photo.isFavorite);
+            // favoritesPhotosMetadata = originalPhotosMetadataExtended.filter(photo => photo.isFavorite);
         });
         // Also update isFavorite flag in currently displayed photos
         filteredPhotosMetadata.forEach(photo => {
             photo.isFavorite = favorites.includes(photo.guid);
         });
-        // setChunkedPhotos();
+    }
+
+    const updateTrash = async () => {
+        // Fetch trash
+        await fetch("/api/trash", {
+            method: 'GET',
+            headers: {
+                'content-type': 'application/json'
+            }
+        })
+        .then((response) => {
+            if (response.ok) {
+                return response.json();
+            } else {
+                // No trash items found
+                // console.error("Failed to fetch trash items, status:", response.status);
+                return [];
+            }
+        })
+        .then((data) => {
+            trash = data;
+            // trashPhotosMetadata = originalPhotosMetadataExtended.filter((photo: PhotoModelExtended) => trash.includes(photo.guid));
+        });
     }
 
     const getCookie = (name: string) => {
@@ -271,14 +312,13 @@
             rowHeights.push(+tallestHeight.toFixed(0));
         }
 
-        virtualList.recomputeSizes(0);
+        if (currentNoPhotos > 0) virtualList.recomputeSizes(0);
     }
 
     // Opens photo modal
     const openModal = (photo: PhotoModelExtended, index: number) => {
-        currentPhoto = photo;
         currentPhotoIndex = index;
-        photoModalIsOpen = true;
+        isPhotoModalOpen = true;
     }
 
     // Handles touch start event
@@ -293,7 +333,7 @@
 
     // Handles closing the photo slider modal
     const handleClosePhotoSlider = () => {
-        photoModalIsOpen = false;
+        isPhotoModalOpen = false;
     }
 
     // Handles closing all modals
@@ -329,37 +369,23 @@
         return `${m}:${s.toString().padStart(2, '0')}`;
     }
 
-    // Toggles video filter on/off
-    const toggleVideosCallback = () => {
-        // toggleShowOnlyVideos = !toggleShowOnlyVideos;
-        // setCookie('mphotos-filterOnlyVideos', toggleShowOnlyVideos.toString());
-        // if (toggleShowOnlyVideos) {
-        //     filteredPhotosMetadata = onlyVideosMetadata;
-        // } else {
-        //     filteredPhotosMetadata = photosAndVideosMetadata;
-        // }
-        // setChunkedPhotos();
-    }
-
-    const toggleFilterVideos = () => {
-        toggleShowOnlyVideos = !toggleShowOnlyVideos;
-        setCookie('mphotos-filterOnlyVideos', toggleShowOnlyVideos.toString());
-        filterPhotosArray();
-    }
-
     const filterPhotosArray = () => {
         filteredPhotosMetadata = photosAndVideosMetadata;
-        if (toggleShowOnlyVideos) {
-            filteredPhotosMetadata = filteredPhotosMetadata.filter((photo: PhotoModelExtended) => photo.type == 'video');
+        
+        if (!filterAll) {
+            if (filterVideos) {
+                filteredPhotosMetadata = filteredPhotosMetadata.filter((photo: PhotoModelExtended) => photo.type == 'video');
+            }
+            if (filterFavorites) {
+                filteredPhotosMetadata = filteredPhotosMetadata.filter((photo: PhotoModelExtended) => favorites.includes(photo.guid));
+            }
         }
-        if (showFavorites) {
-            filteredPhotosMetadata = filteredPhotosMetadata.filter((photo: PhotoModelExtended) => favorites.includes(photo.guid));
-        }
+
         setChunkedPhotos();
     }
 </script>
 
-{#if photoModalIsOpen}
+{#if isPhotoModalOpen}
     <PhotoSlider photos={filteredPhotosMetadata} photoIndex={currentPhotoIndex} closeModal={handleClosePhotoSlider} nrToPreload={2}/>
 {/if}
 <Options
@@ -377,16 +403,15 @@
     zoomOutCallback={() => {
         zoomOut();
     }}
-    toggleVideosCallback={() => {
-        toggleVideosCallback();
-    }}
     toggleSquareProportionsCallback={() => {
         showSquareThumbs = !showSquareThumbs;
         calcRowHeights(showSquareThumbs);
         setCookie('mphotos-squareProportions', showSquareThumbs.toString());
     }}
     closeFromParent={closeAllModalsFromParent}
-    isVideoFiltered={toggleShowOnlyVideos}
+    isVideoFiltered={filterVideos}
+    isFavoriteFiltered={filterFavorites}
+    isShowingAll={filterAll}
     arePhotosSquare={showSquareThumbs}
 />
 <DatePicker 
@@ -396,85 +421,104 @@
     on:setScroll={(e) => {scrollToIndex = Math.floor(e.detail / chunkSize)}}
     closeFromParent={closeAllModalsFromParent}
 />
-{#if chunkedPhotos.length > 0}
-    <div class="text-rounded-corners nr-of-photos">
-        <p>{currentNoPhotos}</p>
-    </div>
-{/if}
-{#if chunkedPhotos.length === 0}
-    <div class="text-rounded-corners no-photos-available">
-        <p>No photos available</p>
-    </div>
-{/if}
+<div class="text-rounded-corners nr-of-photos">
+    <p>{currentNoPhotos}</p>
+</div>
 
-<div id="virtual-list-container">
-    <VirtualList 
-        bind:this={virtualList}
-        width="100%" 
-        height={windowHeight}
-        itemCount={chunkedPhotos.length} 
-        itemSize={rowHeights}
-        scrollToAlignment='center'
-        scrollToBehaviour='instant'
-        on:itemsUpdated={handleListItemUpdate}
-        on:afterScroll={handleCloseAllModals}
-        {scrollToIndex}
-        >
+<div id="virtual-list-wrapper">
+    {#if chunkedPhotos.length === 0}
+        <div class="text-rounded-corners no-photos-available">
+            <p>No photos available</p>
+        </div>
+    {:else}
+    <div id="virtual-list-container">
+        <VirtualList 
+            bind:this={virtualList}
+            width="100%" 
+            height={windowHeight}
+            itemCount={chunkedPhotos.length} 
+            itemSize={rowHeights}
+            scrollToAlignment='center'
+            scrollToBehaviour='instant'
+            on:itemsUpdated={handleListItemUpdate}
+            on:afterScroll={handleCloseAllModals}
+            {scrollToIndex}
+            >
 
-    <div slot="item" let:index let:style {style}>
-        <table style="width: 100%; table-layout: fixed;">
-            <tbody>
-                <tr style="text-align:center;">
-                    {#each chunkedPhotos[index] as currentPhotoMeta, itemIndex}
-                        <td style="">
-                            <a on:click={() => openModal(currentPhotoMeta, index*chunkSize + itemIndex)} href='/'>
-                                <div style="position: relative; display: inline-block;">
-                                    <img 
-                                    id={currentPhotoMeta.guid}
-                                    src="api/photos/{currentPhotoMeta.guid}/thumb"
-                                    alt={currentPhotoMeta.dateTaken}
-                                    style={showSquareThumbs
-                                        ? `height: ${rowHeights[index]-2}px; width: ${rowHeights[index]-2}px; object-fit: cover;`
-                                        : `max-height: ${rowHeights[index]-2}px;`}
-                                    >
-                                    {#if currentPhotoMeta.type === 'video' || currentPhotoMeta.type === 'live-photo-video'}
-                                        {#if currentPhotoMeta.lengthSeconds}
-                                        <span class="video-duration-overlay">
-                                            {formatDuration(currentPhotoMeta.lengthSeconds)}
-                                        </span>
+        <div slot="item" let:index let:style {style}>
+            <table style="width: 100%; table-layout: fixed;">
+                <tbody>
+                    <tr style="text-align:center;">
+                        {#each chunkedPhotos[index] as currentPhotoMeta, itemIndex}
+                            <td style="">
+                                <a on:click={() => openModal(currentPhotoMeta, index*chunkSize + itemIndex)} href='/'>
+                                    <div style="position: relative; display: inline-block;">
+                                        <img 
+                                        id={currentPhotoMeta.guid}
+                                        src="api/photos/{currentPhotoMeta.guid}/thumb"
+                                        alt={currentPhotoMeta.dateTaken}
+                                        style={showSquareThumbs
+                                            ? `height: ${rowHeights[index]-2}px; width: ${rowHeights[index]-2}px; object-fit: cover;`
+                                            : `max-height: ${rowHeights[index]-2}px;`}
+                                        >
+                                        {#if currentPhotoMeta.type === 'video' || currentPhotoMeta.type === 'live-photo-video'}
+                                            {#if currentPhotoMeta.lengthSeconds}
+                                            <span class="video-duration-overlay">
+                                                {formatDuration(currentPhotoMeta.lengthSeconds)}
+                                            </span>
+                                            {/if}
                                         {/if}
-                                    {/if}
-                                    {#if favorites.includes(currentPhotoMeta.guid)}
-                                        <span class="video-duration-overlay favorite-icon">
-                                        </span>
-                                    {/if}
-                                </div>
-                            </a>
-                        </td>
-                    {/each}
-                </tr>
-            </tbody>
-        </table>
-    </div>
+                                        {#if favorites.includes(currentPhotoMeta.guid)}
+                                            <span class="video-duration-overlay favorite-icon">
+                                            </span>
+                                        {/if}
+                                    </div>
+                                </a>
+                            </td>
+                        {/each}
+                    </tr>
+                </tbody>
+            </table>
+        </div>
 
-    </VirtualList>
+        </VirtualList>
+    </div>
+    {/if}
 </div>
 
 <div class="bottom-bar">
     <div>
         <div>
             <button id="library-button" class="interface" 
-                on:click={() => { filteredPhotosMetadata = photosAndVideosMetadata; setChunkedPhotos(); }}>
+                on:click={() => { 
+                    filterAll = true;
+                    filterVideos = false;
+                    filterFavorites = false;
+                    filterPhotosArray(); }} 
+                    aria-label="Show all photos">
             </button>
         </div>
         <div>
             <button id="favorites-button" class="interface" 
-                on:click={() => { filteredPhotosMetadata = favoritesPhotosMetadata; setChunkedPhotos(); }}>
+                on:click={() => { 
+                    filterAll = false;
+                    filterVideos = false;
+                    filterFavorites = true;
+                    filterPhotosArray(); }}
+                    aria-label="Show favorite photos">
             </button>
         </div>
-        <!-- <div>
-            <button id="deleted-button" class="interface"></button>
-        </div> -->
+        <div>
+            <button id="deleted-button" class="interface" 
+                on:click={() => { 
+                    filterAll = true;
+                    filterVideos = false;
+                    filterFavorites = false;
+                    filterTrash = true;
+                    filterPhotosArray(); }}
+                    aria-label="Show photos to be deleted">
+            </button>
+        </div>
     </div>
 </div>
 
@@ -482,6 +526,13 @@
     .bg-black {
         background-color: #121212;
         color: #e0e0e0;
+    }
+
+    #virtual-list-wrapper {
+        position: absolute;
+        width: 100dvw;
+        height: 100dvh;
+        z-index: -1000;
     }
 
     #virtual-list-container {

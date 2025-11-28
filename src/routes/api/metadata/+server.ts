@@ -12,8 +12,8 @@ const originalsDir = env.ORIGINAL_PHOTOS || '/originals';
 const thumbsDir = env.GENERATED_THUMBNAILS || '/thumbs';
 const metaDataFilename = path.join(thumbsDir, env.METADATA_FILE || 'metadata.json');
 const errorLogFilename = path.join(thumbsDir, env.ERRORS_FILE || 'errors.log');
-const thumbnailSizeWidth = env.THUMBNAIL_SIZE || 300;
-const mediumSizeWidth = env.MEDIUM_SIZE || 1200;
+const thumbnailSizeWidth = Number(env.THUMBNAIL_SIZE) || 300;
+const mediumSizeWidth = Number(env.MEDIUM_SIZE) || 1200;
 const videoExts = ['.mp4', '.mov'];
 const imageExts = ['.jpg', '.jpeg', '.heic', '.heif', '.png'];
 

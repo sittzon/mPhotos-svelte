@@ -40,7 +40,7 @@
 
     const getDateFormattedShort = (photo: PhotoModel) => {
         if (photo == null || photo.dateTaken == null) {
-            return "";
+            return "No date";
         }
         
         if (errorNoDateFound == photo.dateTaken)

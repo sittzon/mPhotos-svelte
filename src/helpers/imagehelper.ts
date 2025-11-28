@@ -2,6 +2,7 @@ import sharp from 'sharp';
 import { spawn } from 'child_process';
 import crypto from 'crypto';
 import fs from 'fs/promises';
+import heicConvert from "heic-convert";
 import { ExifTool } from "exiftool-vendored";
 import os from "os";
 
@@ -208,16 +209,26 @@ export function getHashString(str: string): string {
 }
 
 // Resize and save as webp
-export async function generateThumbnailBytes(imagePath: string, w: number, h: number, outPath: string, quality = 80, isHeic: boolean = false): Promise<void>
-{
-    // const imageBuffer = await fs.readFile(imagePath);
-    const sharpImage = await sharp(imagePath)
-        .rotate() // Auto-rotate based on EXIF
-        .resize(w, h, { fit: 'inside' })
-        .webp({ quality });
+export async function generateThumbnailBytes(imagePath: string, w: number, h: number, outPath: string, quality = 80, isHeic: boolean = false): Promise<void> {
+    let sharpBuffer: sharp.Sharp;
+    const inputBuffer = await fs.readFile(imagePath);
+    if (isHeic) {
+        const outputBuffer = await heicConvert({
+            buffer: inputBuffer, // the HEIC file buffer
+            format: 'JPEG',      // output format
+            quality: 1           // the jpeg compression quality, between 0 and 1
+        });
+        sharpBuffer = await sharp(outputBuffer).rotate(); // Auto-rotate based on EXIF
+    }
+    else {
+        sharpBuffer = await sharp(inputBuffer).rotate() // Auto-rotate based on EXIF
+    }
 
+    var webFile = sharpBuffer
+        .resize(w, h, { fit: 'inside' })
+        .webp({ quality })
     try {
-        await sharpImage.toFile(outPath);
+        await webFile.toFile(outPath);
     } catch (e) {
         console.log('Error saving image:', e);
     }
