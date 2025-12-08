@@ -349,6 +349,30 @@
     const event = new CustomEvent('updateFavorites');
     dispatchEvent(event);
   }
+
+  const setCurrentToTrash = async () => {
+    const currentPhoto = photos[currentIndex];
+    photos[currentIndex].isTrash = !photos[currentIndex].isTrash;
+
+    await fetch("/api/trash/" + currentPhoto.guid, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        guid: currentPhoto.guid
+      }),
+    })
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error("Failed to toggle trash status");
+      }
+    })
+
+    // Dispatch update trash event to parent
+    const event = new CustomEvent('updateTrash');
+    dispatchEvent(event);
+  }
 </script>
 
 <div id="slider" on:touchstart={onTouchStart} on:touchmove={onTouchMove} on:touchend={onTouchEnd} role="navigation">
@@ -363,7 +387,7 @@
   {/if}
     <div class="slideshow" style="opacity:{slideshowOpacity};">
       {#each preloadPhotos as photo, i}
-        {#if isVideoPlaying && photo.type === 'video' && i === nrToPreload}
+        {#if isVideoPlaying && (photo.type === 'video' || photo.type === 'live-photo-video') && i === nrToPreload}
           <video width="100%" height="100%" controls autoplay>
             <source 
               src={photo.video}
@@ -381,13 +405,16 @@
             alt={photo.dateTaken}
             style="transform: {transforms[i]};"
           />
-          {#if photo.type === 'video' && !isVideoPlaying && i === nrToPreload}
+          {#if (photo.type === 'video' || photo.type === 'live-photo-video') && !isVideoPlaying && i === nrToPreload}
             <div class="play-icon-container">
-              <button class="play-icon {animating ? 'animating' : ''}" 
+              <button 
+              class="play-icon {animating ? 'animating' : ''}" 
                 on:click={() => isVideoPlaying = true}
                 style="transform: {transforms[i]}"
-              />
-              <span class="video-duration-overlay {animating ? 'animating' : ''}"
+                aria-label="Play video">
+              </button>
+              <span 
+                class="video-duration-overlay {animating ? 'animating' : ''}"
                 style="transform: {transforms[i]}">
                 {formatDuration(photo.lengthSeconds)}
               </span>
@@ -395,9 +422,15 @@
           {/if}
           <div>
             <button 
-              class="{photos[currentIndex].isFavorite ? 'favorite-icon-checked' : 'favorite-icon-unchecked'} fadeout" 
+              class="icon {photos[currentIndex].isFavorite ? 'favorite-checked' : 'favorite-unchecked'} fadeout" 
               on:click={() => setCurrentAsFavorite()}
-            />
+              aria-label={photos[currentIndex].isFavorite ? "Unmark as favorite" : "Mark as favorite"}>
+            </button>
+            <button 
+              class="icon {photos[currentIndex].isTrash ? 'trash-checked' : 'trash'} fadeout" 
+              on:click={() => setCurrentToTrash()}
+              aria-label="Move to trash">
+            </button>
           </div>
         {/if}
       {/each}
@@ -605,34 +638,43 @@
     justify-content: space-between;
     line-height: 0.8;
   }
-  
-  .favorite-icon-checked {
+
+  .icon {
     position: fixed;
     bottom: 10px;
-    left: 50%;
-    right: 50%;
     width: 40px;
     height: 40px;
-    transform: translateX(-50%);
     background-color: white;
     z-index: 20;
-    mask: url('/favorite-checked.svg') no-repeat center;
     background-size: contain;
     border: none;
   }
   
-  .favorite-icon-unchecked {
-    position: fixed;
-    bottom: 10px;
-    left: 50%;
+  .favorite-checked {
+    left: calc(50% - 40px);
     right: 50%;
-    width: 40px;
-    height: 40px;
     transform: translateX(-50%);
-    background-color: white;
-    z-index: 20;
+    mask: url('/favorite-checked.svg') no-repeat center;
+  }
+  
+  .favorite-unchecked {
+    left: calc(50% - 40px);
+    right: 50%;
+    transform: translateX(-50%);
     mask: url('/favorite-unchecked.svg') no-repeat center; 
-    background-size: contain;
-    border: none;
+  }
+
+  .trash {
+    left: calc(50% + 40px);
+    right: 50%;
+    transform: translateX(-50%);
+    mask: url('/deleted.svg') no-repeat center;
+  }
+
+  .trash-checked {
+    left: calc(50% + 40px);
+    right: 50%;
+    transform: translateX(-50%);
+    mask: url('/deleted-filled.svg') no-repeat center;
   }
 </style>

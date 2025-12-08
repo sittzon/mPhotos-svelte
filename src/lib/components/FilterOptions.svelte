@@ -1,37 +1,43 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import type { PhotoModel, PhotoModelExtended } from "$api";
-    import { cubicOut } from 'svelte/easing';
 
     export let isShowingAll: boolean = false;
     export let isVideoFiltered: boolean = false;
     export let isFavoriteFiltered: boolean = false;
+    export let isLivePhotoVideosFiltered: boolean = false;
+    export let isPhotosFiltered: boolean = false;
 
     let isModalOpen: boolean = false;
 
     const dispatchShowAllEvent = () => {
-        const event = new CustomEvent('showAll');
-        dispatchEvent(event);
+        dispatchEvent(new CustomEvent('showAll'));
     }
 
     const dispatchToggleVideosEvent = () => {
-        const event = new CustomEvent('toggleVideos');
-        dispatchEvent(event);
+        dispatchEvent(new CustomEvent('toggleVideos'));
+    }
+
+    const dispatchTogglePhotosEvent = () => {
+        dispatchEvent(new CustomEvent('togglePhotos'));
     }
 
     const dispatchToggleFavoritesEvent = () => {
-        const event = new CustomEvent('toggleFavorites');
-        dispatchEvent(event);
+        dispatchEvent(new CustomEvent('toggleFavorites'));
+    }
+
+    const dispatchToggleLivePhotoVideosEvent = () => {
+        dispatchEvent(new CustomEvent('toggleLivePhotoVideos'));
     }
 
     $: options = [
-        {id: 0, displayName: 'Show all', val: isShowingAll, func: () => {dispatchShowAllEvent()}, icon: 'aspect-ratio', disabled: !isVideoFiltered && !isFavoriteFiltered},
-        {id: 1, displayName: 'Videos', val: isVideoFiltered, func: () => {dispatchToggleVideosEvent()}, icon: 'video'},
-        {id: 2, displayName: 'Favorites', val: isFavoriteFiltered, func: () => {dispatchToggleFavoritesEvent()}, icon: 'favorite-checked'},
+        {id: 0, displayName: 'Show all', val: isShowingAll, func: () => {dispatchShowAllEvent()}, icon: 'aspect-ratio', disabled: !isVideoFiltered && !isFavoriteFiltered && !isPhotosFiltered && !isLivePhotoVideosFiltered},
+        {id: 1, displayName: 'Photos', val: isPhotosFiltered, func: () => {dispatchTogglePhotosEvent()}, icon: 'photo'},
+        {id: 2, displayName: 'Videos', val: isVideoFiltered, func: () => {dispatchToggleVideosEvent()}, icon: 'video'},
+        {id: 3, displayName: 'Favorites', val: isFavoriteFiltered, func: () => {dispatchToggleFavoritesEvent()}, icon: 'favorite-checked'},
+        {id: 4, displayName: 'Live Photo Videos', val: isLivePhotoVideosFiltered, func: () => {dispatchToggleLivePhotoVideosEvent()}, icon: 'live-photo-video'},
     ]
 
     onMount(() => {
-        // document.addEventListener('click', handleToggleOpen);
         document.addEventListener('toggleOpenFilterOptions', (event) => {
             console.log("Toggled from parent!");
             isModalOpen = event.detail.isOpen;
@@ -76,22 +82,19 @@
         list-style: none;
         list-style-type: none;
         text-align: right;
-        padding: 5px 5px 5px 32px;
+        padding: 5px 5px 5px 12px;
         width: 200px;
+        text-align: right;
     }
     
     li {
         margin: 5px 0;
     }
 
-    .option-item::before {
-        content: '';
-        position: absolute;
-        left: 8px;
-        width: 24px;
-        height: 24px;
-        background: var(--icon-url) no-repeat center;
-        background-size: contain;
+    label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
     }
     
     .text-rounded-corners {
@@ -101,11 +104,7 @@
         margin: 0;
     }
 
-    .clicked {
-        background-color: aliceblue;
-    }
-
-    .disabled {
+    input:disabled {
         pointer-events: none;
         opacity: 0.3;
     }

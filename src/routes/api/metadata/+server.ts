@@ -1,7 +1,6 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import fs from 'fs/promises';
 import path from 'path';
-// import { config } from '$config';
 import { env } from '$env/dynamic/private'
 import type { PhotoServerModel, PhotoModel } from '$api';
 import { getImageDimensions, getVideoDimensions, getVideoDuration, generateVideoThumbnail, shutdownExifTool, getHashString, generateThumbnailBytes, getDateTakenFromPath } from '$helpers/imagehelper';
@@ -29,11 +28,7 @@ async function loadPhotos() {
         }
 
         // Create thumbs dir if not exists
-        try {
-            await fs.stat(thumbsDir);
-        } catch {
-            await fs.mkdir(thumbsDir, { recursive: true });
-        }
+        await fs.mkdir(thumbsDir, { recursive: true });
 
         // First, get all original photo and video files
         let originalPhotos = await getFileInfosRecursively(originalsDir);
@@ -41,32 +36,65 @@ async function loadPhotos() {
             imageExts.includes(x.Extension.toLowerCase())
             || videoExts.includes(x.Extension.toLowerCase())
         );
+        
+        let photosToIndex = originalPhotos;
+        let photoLocsToIndex = originalPhotos.map(x => x.FullName);
+        let photoLocsToRemove: string[] = [];
 
         let photoMetadata: PhotoServerModel[] = [];
-        try {
-            // Check if metadata file exists and only index new photos not found in metadata file
-            const metaExists = await fs.stat(metaDataFilename).then(() => true).catch(() => false);
-            if (metaExists) {
-                // If exists, load existing metadata
-                const metaRaw = await fs.readFile(metaDataFilename, 'utf-8');
-                photoMetadata = JSON.parse(metaRaw);
-                const originalPhotosLocs = originalPhotos.map(x => x.FullName);
-                const photoMetadataLocs = photoMetadata.map(x => x.location);
-                // Only index new photos that are not already in metadata file
-                const photosToIndex = originalPhotosLocs.filter(loc => !photoMetadataLocs.includes(loc));
-                // Filter originalPhotos to only those that need to be indexed
-                originalPhotos = originalPhotos.filter(x => photosToIndex.includes(x.FullName));
-            }
-        } catch {}
+        // Check if metadata file exists and only index new photos not found in metadata file
+        const metaExists = await fs.stat(metaDataFilename).then(() => true).catch(() => false);
+        if (metaExists) {
+            // If exists, load existing metadata
+            const metaRaw = await fs.readFile(metaDataFilename, 'utf-8');
+            photoMetadata = JSON.parse(metaRaw);
 
-        console.log(`Indexing ${originalPhotos.length} new photos/videos`);
+            const originalPhotosLocs = originalPhotos.map(x => x.FullName);
+            const photoMetadataLocs = photoMetadata.map(x => x.location);
+
+            // Filter out from photoMetadataLocs the ones that are not present in originalPhotosLocs 
+            // (i.e. deleted files), and also add those that have not been indexed yet
+            photoLocsToIndex = originalPhotosLocs.filter(loc => !photoMetadataLocs.includes(loc));
+            photoLocsToRemove = photoMetadataLocs.filter(loc => !originalPhotosLocs.includes(loc));
+        }
+
+        if (metaExists) {
+            console.log(`Syncing photos/videos with metadata file...`);
+        }
+
+        if (metaExists && photoLocsToRemove.length > 0) {
+            // Remove deleted photos from metadata
+            console.log(`Removing metadata and thumbnails for ${photoLocsToRemove.length} photos/videos`);
+            photoMetadata = photoMetadata.filter(x => !photoLocsToRemove.includes(x.location));
+
+            // Also remove their thumbnails and medium files
+            for (const loc of photoLocsToRemove) {
+                const guid = getHashString(loc);
+                const thumbPath = path.join(thumbsDir, guid.substring(0, 2), guid.substring(2, 4), guid + '.webp');
+                const mediumPath = path.join(thumbsDir, guid.substring(0, 2), guid.substring(2, 4), guid + '-medium.webp');
+                await fs.unlink(thumbPath).catch(() => { });
+                await fs.unlink(mediumPath).catch(() => { });
+            }
+        }        
+        
+        if (metaExists) {
+            console.log(`Indexing ${photoLocsToIndex.length} new photos/videos`);
+            photosToIndex = originalPhotos.filter(x => photoLocsToIndex.includes(x.FullName));
+        }
+
+        // Order by photos first, videos second
+        photosToIndex.sort((a, b) => {
+            const aIsVideo = videoExts.includes(a.Extension.toLowerCase());
+            const bIsVideo = videoExts.includes(b.Extension.toLowerCase());
+            if (aIsVideo && !bIsVideo) return 1;
+            if (!aIsVideo && bIsVideo) return -1;
+            return 0;
+        });
 
         let i = 0;
-        // originalPhotos now only contains new photos to index
-        for (const fileInfo of originalPhotos) {
-            console.log(`Indexing: ${fileInfo.FullName}`);
+        for (const fileInfo of photosToIndex) {
+            console.debug(`Indexing: ${fileInfo.FullName}`);
             try {
-                // If video, then use getVideoDimensions
                 let bytes: Buffer;
                 let width: number = 0;
                 let height: number = 0;
@@ -74,23 +102,45 @@ async function loadPhotos() {
                 let type: 'photo' | 'video' | 'live-photo-video' = 'photo';
                 let lengthSeconds: number | null = null;
                 let isVideo = videoExts.includes(fileInfo.Extension.toLowerCase());
+
                 if (isVideo) {
                     [width, height] = await getVideoDimensions(fileInfo.FullName);
-                    dateTaken = await getDateTakenFromPath(fileInfo.FullName) as string;
-
-                    // If video is less than 4 seconds, treat as live photo sidecar video
                     lengthSeconds = await getVideoDuration(fileInfo.FullName);
-                    if (lengthSeconds < 4) {
-                        type = 'live-photo-video';
-                    } else {
-                        type = 'video';
+
+                    // Check if this is a sidecar live photo video by looking for a same-named photo file
+                    let dateTakenFromSidecar = false;
+                    imageExts.forEach(async (imgExt) => {
+                        // Strip extension from video file
+                        const fileInfoWithoutExt = fileInfo.FullName.substring(0, fileInfo.FullName.lastIndexOf('.'));
+                        const sidecarPath = path.join(fileInfoWithoutExt + imgExt);
+                        // Check if photo exists in photoMetaData
+                        const potentialReferencePhoto = photoMetadata.find(x => x.location === sidecarPath);
+                        if (potentialReferencePhoto) {
+                            // Use date from sidecar photo file
+                            dateTakenFromSidecar = true;
+                            console.info(`Found sidecar live photo image: ${sidecarPath}`);
+                            // Take date from photoMetaData
+                            dateTaken = potentialReferencePhoto.dateTaken;
+                            type = 'live-photo-video';
+                            return;
+                        }
+                    });
+
+                    if (!dateTakenFromSidecar) { // Not already marked as live photo above
+                        dateTaken = await getDateTakenFromPath(fileInfo.FullName) as string;
+                        // Very crude: if video is less than 4 seconds, treat as live photo video
+                        if (lengthSeconds < 4) {
+                            type = 'live-photo-video';
+                        } else {
+                            type = 'video';
+                        }
                     }
                 } else {
                     bytes = await fs.readFile(fileInfo.FullName);
                     [width, height] = await getImageDimensions(bytes);
                     dateTaken = await getDateTakenFromPath(fileInfo.FullName) as string;
                 }
-                // const dateTaken = await getDateTaken(bytes) as string;
+
                 const photoMeta: PhotoServerModel = {
                     dateTaken: dateTaken,
                     guid: getHashString(fileInfo.FullName),
@@ -105,24 +155,15 @@ async function loadPhotos() {
                 photoMetadata.push(photoMeta);
                 photoMetadata.sort((a, b) => a.dateTaken.localeCompare(b.dateTaken));
 
-                // Only generate thumbnail if not found on disk
                 const isHeic = fileInfo.Extension.toLowerCase() === '.heic' || fileInfo.Extension.toLowerCase() === '.heif';
-                // Split output path into several subfolders, two levels deep, based on first 4 characters of GUID
-                const dirLevel1 = path.join(thumbsDir, photoMeta.guid.substring(0, 2));
-                const dirLevel2 = path.join(dirLevel1, photoMeta.guid.substring(2, 4));
-                try {
-                    await fs.stat(dirLevel1);
-                } catch {
-                    await fs.mkdir(dirLevel1);
-                }
-                try {
-                    await fs.stat(dirLevel2);
-                } catch {
-                    await fs.mkdir(dirLevel2);
-                }
-
+                // Split output path into two level subfolders, based on first 4 characters of GUID
+                const sub1 = photoMeta.guid.substring(0, 2);
+                const sub2 = photoMeta.guid.substring(2, 4);
+                const outDir = path.join(thumbsDir, sub1, sub2);
+                await fs.mkdir(outDir, { recursive: true });
+                
                 // Generate thumbnail
-                const thumbPath = path.join(thumbsDir, photoMeta.guid.substring(0, 2), photoMeta.guid.substring(2, 4), photoMeta.guid + '.webp');
+                const thumbPath = path.join(thumbsDir, sub1, sub2, photoMeta.guid + '.webp');
                 const thumbFileExists = await fs.stat(thumbPath).then(() => true).catch(() => false);
                 if (!thumbFileExists) {
                     const aspectRatio = photoMeta.width / photoMeta.height;
@@ -136,7 +177,7 @@ async function loadPhotos() {
                 }
                 
                 // Do same for medium size
-                const mediumPath = path.join(thumbsDir, photoMeta.guid.substring(0, 2), photoMeta.guid.substring(2, 4), photoMeta.guid + '-medium.webp');
+                const mediumPath = path.join(thumbsDir, sub1, sub2, photoMeta.guid + '-medium.webp');
                 const mediumFileExists = await fs.stat(mediumPath).then(() => true).catch(() => false);
                 const mediumSizeWidthMin = Math.min(photoMeta.width, mediumSizeWidth); // Don't upscale beyond original width
                 const mediumSizeHeight = Math.floor(photoMeta.height * (mediumSizeWidthMin / photoMeta.width));
@@ -167,7 +208,9 @@ async function loadPhotos() {
     }
 }
 
-// GET /api/metadata
+/// GET /api/metadata
+/// Returns essential metadata for all photos to display correctly 
+/// (and some non-essential nice-to-haves), sorted by dateTaken descending
 export const GET: RequestHandler = async ({ url }) => {
     await loadPhotos();
     const photos: PhotoServerModel[] = memoryCache[photosMetaCacheKey] || [];

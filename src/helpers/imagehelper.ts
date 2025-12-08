@@ -12,7 +12,7 @@ const cpuCount = os.cpus()?.length || 1;
 const DEFAULT_MAX_PROCS = Math.max(1, Math.min(cpuCount, Number(process.env.EXIF_MAX_PROCS || cpuCount)));
 
 // Create a single ExifTool manager. It will internally spawn up to `maxProcs` child exiftool processes.
-const exiftool = new ExifTool({ maxProcs: DEFAULT_MAX_PROCS });
+let exiftool = new ExifTool({ maxProcs: DEFAULT_MAX_PROCS });
 
 // Graceful shutdown: ensure child processes are closed when node exits.
 // Use beforeExit/exit/SIGINT/SIGTERM to be safe in different environments.
@@ -163,7 +163,7 @@ export async function getVideoDateTaken(filePath: string): Promise<string | null
 export async function getDateTakenFromPath(imagePath: string): Promise<string | null> {
     // Check file extension to determine if it's a video
     const ext = imagePath.split('.').pop()?.toLowerCase();
-    const videoExts = ['mp4', 'mov', 'avi', 'mkv', 'webm'];
+    const videoExts = ['mp4', 'mov'];
     if (ext && videoExts.includes(ext)) {
         // Use ffprobe for video files
         try {
@@ -176,6 +176,7 @@ export async function getDateTakenFromPath(imagePath: string): Promise<string | 
     }
     // Otherwise, treat as image and use EXIF
     try {
+        if (!exiftool) exiftool = new ExifTool({ maxProcs: DEFAULT_MAX_PROCS });
         const tags = await exiftool.read(imagePath);
         // example: "2218:09:22 02:32:14"
         const dt = tags.DateTimeOriginal;

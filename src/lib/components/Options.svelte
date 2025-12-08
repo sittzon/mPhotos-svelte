@@ -4,7 +4,7 @@
     import FilterOptions from './FilterOptions.svelte';
     import { cubicOut } from 'svelte/easing';
 
-    export let photos: Array<PhotoModel> = [];
+    export let photos: Array<PhotoModelExtended> = [];
     export let currentChunkSize: number = 5;
     export let minChunkSize: number = 3;
     export let maxChunkSize: number = 12;
@@ -17,6 +17,8 @@
     export let isShowingAll: boolean = false;
     export let closeFromParent: boolean = false;
     export let arePhotosSquare: boolean = false;
+    export let isLivePhotoVideosFiltered: boolean = false;
+    export let isPhotosFiltered: boolean = false;
 
     let isFilterOptionsOpen: boolean = false;
     let isModalOpen: boolean = false;
@@ -64,11 +66,10 @@
         }
         else if (target.closest('#options')) {
             isModalOpen = !isModalOpen;
-        } 
-        // else {
-        //     isModalOpen = false;
-        //     isFilterOptionsOpen = false;
-        // }
+            if (!isModalOpen) {
+                isFilterOptionsOpen = false;
+            }
+        }
     }
 
     const sort = (latestFirst = true) => {
@@ -130,7 +131,7 @@
 
 <button id="options" class="text-rounded-corners">
     {#if !isModalOpen}
-        <div class="hamburger-icon" transition:slideAndResizeSequential={{ duration: 300 }}/>
+        <div class="hamburger-icon" transition:slideAndResizeSequential={{ duration: 300 }}></div>
     {:else}
         <ul transition:slideAndResizeSequential={{duration: 300}}>
             {#each options as {displayName, func, icon, disabled}}
@@ -152,6 +153,8 @@
             isVideoFiltered={isVideoFiltered}
             isFavoriteFiltered={isFavoriteFiltered}
             isShowingAll={isShowingAll}
+            isLivePhotoVideosFiltered={isLivePhotoVideosFiltered}
+            isPhotosFiltered={isPhotosFiltered}
         />
     </div>
 {/if}
@@ -175,6 +178,8 @@
         background: none;
         border: none;
         padding: 0;
+        width: 100%;
+        text-align: right;
     }
     
     .hamburger-icon {
