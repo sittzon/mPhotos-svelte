@@ -536,7 +536,7 @@
     box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.9);
     position: absolute;
     z-index: 20;
-    top: 16px;
+    top: 56px;
     right: 16px;
     background: rgba(255,255,255,0.6);
     border-radius: 50%;
@@ -597,7 +597,7 @@
       position: fixed; 
       z-index: 20; 
       height: 25px;
-      top: 10px;
+      top: 50px;
       left: 50%;
       transform: translate(-50%, 0);
       pointer-events: none;
