@@ -450,8 +450,11 @@
                 filteredPhotosMetadata = filteredPhotosMetadata.filter((photo: PhotoModelExtended) => photo.type == 'live-photo-video');
             }
         }
-
-        setChunkedPhotos();
+        if (filteredPhotosMetadata.length > 0) {
+            setChunkedPhotos();
+        } else {
+            chunkedPhotos = [];
+        }
     }
 
     const setFilters = (photos: boolean, videos: boolean, favorites: boolean, livePhotoVideos: boolean, trash: boolean) => {
