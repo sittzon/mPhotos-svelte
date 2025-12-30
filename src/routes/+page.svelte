@@ -19,16 +19,15 @@
     
     // The actual array of photos used in the virtual list, divided into chunks/rows for display
     let chunkedPhotos : Array<Array<PhotoModelExtended>> = [];
-    // let chunkSize: number =  5;
-    let chunkSize = writable(5);
-    $: maxChunkSize = window.innerWidth > 1200 ? 12 : (window.innerWidth > 800 ? 9 : 7);
+    let chunkSize: number =  5;
+    let maxChunkSize: number = 12; // Varies based on window width
     const minChunkSize: number = 3; // No less than 3 columns
     
     let datepickerIndex: number = 0;
     let currentPhotoIndex: number = 0;
     let rowHeights: Array<number> = [];
     
-    $: windowHeight = window.innerHeight;//: number = 1000;
+    let windowHeight: number = 1000;
     let scrollToIndex: number | undefined = undefined;
     let closeAllModalsFromParent = false;
     let isFingerDown: boolean = false;
@@ -53,25 +52,17 @@
 
     onMount(async () =>
     {
-        // windowHeight = window.innerHeight;
+        windowHeight = window.outerHeight;
 
-        // Read and set options from local storage
-        // TODO: switch to cookies for all options
-        const tempChunkSize = localStorage.getItem('mphotos-zoomLevel');
-        chunkSize = writable(tempChunkSize ? Number(tempChunkSize) : 0);
-        chunkSize.subscribe((value) => {
-            localStorage.setItem("mphotos-zoomLevel", value.toString());
-        });
-
-
-        // const tempChunkSize = getCookie('mphotos-zoomLevel');
+        // Read and set options from cookies
+        const tempChunkSize = getCookie('mphotos-zoomLevel');
         const tempFilterPhotos = getCookie('mphotos-filterPhotos');
         const tempFilterVideos = getCookie('mphotos-filterVideos');
         const tempFilterFavorites = getCookie('mphotos-filterFavorites');
         const tempFilterLivePhotoVideos = getCookie('mphotos-filterLivePhotoVideos');
         const tempSquareProportions = getCookie('mphotos-squareProportions');
         const tempScrollToIndex = getCookie('mphotos-scrollToIndex');
-        // chunkSize = tempChunkSize? +tempChunkSize : chunkSize;
+        chunkSize = tempChunkSize? +tempChunkSize : chunkSize;
         filterPhotos = tempFilterPhotos === 'true' ? true : false;
         filterVideos = tempFilterVideos === 'true' ? true : false;
         filterFavorites = tempFilterFavorites === 'true' ? true : false;
@@ -109,26 +100,26 @@
             // photosAndVideosMetadata = originalPhotosMetadataExtended
             //     .filter((photo: PhotoModelExtended) => photo.type == 'photo' || photo.type == 'video');
                 
-            // filterPhotosArray();
+            filterPhotosArray();
                 
-            filteredPhotosMetadata = photosAndVideosMetadata;
-            if (filterPhotos && filterVideos) {
-                filteredPhotosMetadata = filteredPhotosMetadata.filter((photo: PhotoModelExtended) => photo.type == 'photo' || photo.type == 'video');
-            }
-            else if (filterPhotos) {
-                filteredPhotosMetadata = filteredPhotosMetadata.filter((photo: PhotoModelExtended) => photo.type == 'photo');
-            }
-            else if (filterVideos) {
-                filteredPhotosMetadata = filteredPhotosMetadata.filter((photo: PhotoModelExtended) => photo.type == 'video');
-            }
-            if (filterFavorites) {
-                filteredPhotosMetadata = filteredPhotosMetadata.filter((photo: PhotoModelExtended) => favorites.includes(photo.guid));
-            }
-            if (filterLivePhotoVideos) {
-                filteredPhotosMetadata = filteredPhotosMetadata.filter((photo: PhotoModelExtended) => photo.type == 'live-photo-video');
-            }
+            // filteredPhotosMetadata = originalPhotosMetadataExtended.filter((photo: PhotoModelExtended) => !photo.isTrash);
+            // if (filterPhotos && filterVideos) {
+            //     filteredPhotosMetadata = filteredPhotosMetadata.filter((photo: PhotoModelExtended) => photo.type == 'photo' || photo.type == 'video');
+            // }
+            // else if (filterPhotos) {
+            //     filteredPhotosMetadata = filteredPhotosMetadata.filter((photo: PhotoModelExtended) => photo.type == 'photo');
+            // }
+            // else if (filterVideos) {
+            //     filteredPhotosMetadata = filteredPhotosMetadata.filter((photo: PhotoModelExtended) => photo.type == 'video');
+            // }
+            // if (filterFavorites) {
+            //     filteredPhotosMetadata = filteredPhotosMetadata.filter((photo: PhotoModelExtended) => favorites.includes(photo.guid));
+            // }
+            // if (filterLivePhotoVideos) {
+            //     filteredPhotosMetadata = filteredPhotosMetadata.filter((photo: PhotoModelExtended) => photo.type == 'live-photo-video');
+            // }
             if (filteredPhotosMetadata.length > 0) {
-                setChunkedPhotos();
+                // setChunkedPhotos();
                 // Set scroll position after element is rendered
                 setTimeout(() => {
                     scrollToIndex = tempScrollToIndex ? +tempScrollToIndex : -1;
@@ -304,42 +295,42 @@
     // Set chunked photos array with current chunk size and calculates row heights
     // To be run when photo contents, width or height are changed or zoom level is changed
     const setChunkedPhotos = () => {
-        chunkedPhotos = chunkArray(filteredPhotosMetadata, $chunkSize);
+        chunkedPhotos = chunkArray(filteredPhotosMetadata, chunkSize);
         calcRowHeights(showSquareThumbs);
     }
 
     // Update max chunk size based on window width
     // To be run when window is resized, orientation changed or zooming in/out
-    // const updateMaxChunkSize = () => {
-    //     maxChunkSize = window.innerWidth > 1200 ? 12 : (window.innerWidth > 800 ? 9 : 7);
-    // }
+    const updateMaxChunkSize = () => {
+        maxChunkSize = window.innerWidth > 1200 ? 12 : (window.innerWidth > 800 ? 9 : 7);
+    }
 
     // Sets new zoom level and updates chunked photos
     const zoomIn = () => {
-        // updateMaxChunkSize();
-        if ($chunkSize - minChunkSize > 0) {
-            chunkSize.update(n => n - 2);
-            // setCookie('mphotos-zoomLevel', $chunkSize.toString());
+        updateMaxChunkSize();
+        if (chunkSize - minChunkSize > 0) {
+            chunkSize -= 2;
+            setCookie('mphotos-zoomLevel', chunkSize.toString());
             setChunkedPhotos();
         }
     }
     
     // Sets new zoom level and updates chunked photos
     const zoomOut = () => {
-        // updateMaxChunkSize();
-        if ($chunkSize < maxChunkSize) {
-            chunkSize.update(n => n + 2);
-            // setCookie('mphotos-zoomLevel', $chunkSize.toString());
+        updateMaxChunkSize();
+        if (chunkSize < maxChunkSize) {
+            chunkSize += 2;
+            setCookie('mphotos-zoomLevel', chunkSize.toString());
             setChunkedPhotos();
         }
     }
 
     // Calculate row heights based on current chunk size, window width and thumbnail proportions
     const calcRowHeights = (useSquareThumbs: boolean = false) => {
-        // updateMaxChunkSize();
+        updateMaxChunkSize();
         rowHeights = [];
         const windowInnerWidth = window.innerWidth;
-        const maxImgWidth = windowInnerWidth / $chunkSize;
+        const maxImgWidth = windowInnerWidth / chunkSize;
 
         if (useSquareThumbs) {
             for (let i = 0; i < chunkedPhotos.length; ++i) {
@@ -407,7 +398,7 @@
     const handleListItemUpdate = (e: ItemsUpdatedEvent) => {
         const { start, end } = e.detail;
         const middlePhotoRow = start + Math.floor((end - start) / 2);
-        const photoIndex = middlePhotoRow * $chunkSize;
+        const photoIndex = middlePhotoRow * chunkSize;
         datepickerIndex = photoIndex;
         const tempScrollIndex = getCookie('mphotos-scrollToIndex');
         if (tempScrollIndex && +tempScrollIndex === middlePhotoRow) {
@@ -476,7 +467,7 @@
 {/if}
 <Options
     photos={filteredPhotosMetadata}
-    currentChunkSize={$chunkSize}
+    currentChunkSize={chunkSize}
     maxChunkSize={maxChunkSize}
     minChunkSize={minChunkSize}
     sortedPhotosCallback={(sortedPhotos) => {
@@ -505,8 +496,8 @@
 <DatePicker 
     photos={filteredPhotosMetadata} 
     photoIndex={datepickerIndex} 
-    chunkSize={$chunkSize}
-    on:setScroll={(e) => {scrollToIndex = Math.floor(e.detail / $chunkSize)}}
+    chunkSize={chunkSize}
+    on:setScroll={(e) => {scrollToIndex = Math.floor(e.detail / chunkSize)}}
     closeFromParent={closeAllModalsFromParent}
 />
 <div class="text-rounded-corners nr-of-photos">
@@ -539,7 +530,7 @@
                     <tr style="text-align:center;">
                         {#each chunkedPhotos[index] as currentPhotoMeta, itemIndex}
                             <td style="">
-                                <a on:click={() => openModal(currentPhotoMeta, index*$chunkSize + itemIndex)} href='/'>
+                                <a on:click={() => openModal(currentPhotoMeta, index*chunkSize + itemIndex)} href='/'>
                                     <div style="position: relative; display: inline-block;">
                                         <img 
                                         id={currentPhotoMeta.guid}
@@ -668,7 +659,7 @@
     .nr-of-photos {
         position: fixed;
         left: 10px;
-        top: 45px; 
+        top: 85px; 
         height: 25px;
         padding: 0 5px 0 5px;
     }

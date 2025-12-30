@@ -65,7 +65,7 @@
     #filter-options {
         cursor: pointer;
         font-size: 16px;
-        top: 200px;
+        top: 240px;
         right: 10px;
         position: fixed;
         align-items: center;

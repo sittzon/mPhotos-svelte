@@ -143,7 +143,7 @@
         cursor: pointer;
         font-size: 18px; 
         left: 10px; 
-        top: 10px;
+        top: 50px;
         text-align: center;
         color: darkslategray;
         align-items: center;

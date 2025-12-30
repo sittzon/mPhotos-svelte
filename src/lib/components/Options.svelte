@@ -163,7 +163,7 @@
     #options {
         cursor: pointer;
         font-size: 16px;
-        top: 10px;
+        top: 50px;
         right: 10px;
         position: fixed;
         align-items: center;
